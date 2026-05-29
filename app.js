@@ -84,7 +84,7 @@ const loadImage = async (kind, file) => {
   const image = await compressImage(file);
   state[`${kind}Image`] = image;
   state[`${kind}Result`] = null;
-  clearReview(kind);
+  clearCorrection(kind);
 
   const preview = $(`${kind}Preview`);
   $(`${kind}Stage`).style.aspectRatio = `${image.width} / ${image.height}`;
@@ -122,6 +122,13 @@ const normalizePoint = (point = {}) => ({
   y: Math.max(0, Math.min(100, Number(point.y ?? 0))),
 });
 
+const normalizeSegments = (feature = {}) => {
+  const rawSegments = Array.isArray(feature.segments) && feature.segments.length ? feature.segments : [feature.points || []];
+  return rawSegments
+    .map((segment) => segment.map(normalizePoint).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)))
+    .filter((segment) => segment.length >= 2);
+};
+
 const palmMainLineIds = new Set(["life_line", "head_line", "heart_line", "fate_line", "marriage_line"]);
 
 const pointDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -143,10 +150,23 @@ const canDrawTrace = (kind, feature, points) => {
     return points.length >= 3 && !feature.needsReview && (feature.confidence ?? 0) >= 0.7;
   }
   const score = traceScore(points);
-  return points.length >= 4 && score.length >= 14 && score.maxSegment <= 32 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
+  const minPoints = feature.featureId === "marriage_line" ? 2 : 3;
+  return points.length >= minPoints && score.length >= 4 && score.maxSegment <= 26 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
 };
 
 const activeFeatures = (result) => (result?.features || []).filter((feature) => feature.included !== false);
+
+const clearCorrection = (kind) => {
+  const panel = $(`${kind}CorrectionPanel`);
+  const input = $(`${kind}Correction`);
+  if (panel) panel.hidden = true;
+  if (input) input.value = "";
+};
+
+const showCorrection = (kind) => {
+  const panel = $(`${kind}CorrectionPanel`);
+  if (panel) panel.hidden = false;
+};
 
 const drawMarks = (kind, result) => {
   const svg = $(`${kind}Marks`);
@@ -155,14 +175,16 @@ const drawMarks = (kind, result) => {
   for (const feature of features) {
     const box = normalizeBox(feature.box);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    const points = (feature.points || []).map(normalizePoint).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
-    const shouldDrawTrace = canDrawTrace(kind, feature, points);
+    const drawableSegments = normalizeSegments(feature).filter((segment) => canDrawTrace(kind, feature, segment));
+    const firstPoint = drawableSegments[0]?.[0];
 
-    if (shouldDrawTrace) {
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-      line.setAttribute("class", "mark-line");
-      line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
-      group.append(line);
+    if (drawableSegments.length) {
+      for (const segment of drawableSegments) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        line.setAttribute("class", "mark-line");
+        line.setAttribute("points", segment.map((point) => `${point.x},${point.y}`).join(" "));
+        group.append(line);
+      }
     } else {
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       rect.setAttribute("class", feature.needsReview ? "mark-box mark-candidate" : "mark-box");
@@ -176,8 +198,8 @@ const drawMarks = (kind, result) => {
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("class", "mark-label");
-    label.setAttribute("x", Math.min(94, shouldDrawTrace ? points[0].x : box.x + 1));
-    label.setAttribute("y", Math.max(5, (shouldDrawTrace ? points[0].y : box.y) - 1));
+    label.setAttribute("x", Math.min(94, firstPoint ? firstPoint.x : box.x + 1));
+    label.setAttribute("y", Math.max(5, (firstPoint ? firstPoint.y : box.y) - 1));
     label.textContent = `${feature.name || feature.featureId || "特殊点"}${feature.needsReview ? "候选" : ""}`;
 
     group.append(label);
@@ -185,179 +207,7 @@ const drawMarks = (kind, result) => {
   }
 };
 
-const reviewSummary = (result) => {
-  const features = result?.features || [];
-  return {
-    kept: features.filter((feature) => feature.included !== false).length,
-    excluded: features.filter((feature) => feature.included === false).length,
-    confirmed: features.filter((feature) => feature.reviewStatus === "confirmed").length,
-  };
-};
-
-const clearReview = (kind) => {
-  const panel = $(`${kind}Review`);
-  const list = $(`${kind}ReviewList`);
-  if (panel) panel.hidden = true;
-  if (list) list.innerHTML = "";
-};
-
-const prepareReview = (kind, result) => ({
-  ...result,
-  features: (result.features || []).map((feature, index) => ({
-    ...feature,
-    localId: `${kind}-${Date.now()}-${index}`,
-    included: feature.included !== false,
-    reviewStatus: feature.needsReview ? "pending" : "kept",
-  })),
-});
-
-const renderReview = (kind) => {
-  const result = state[`${kind}Result`];
-  const panel = $(`${kind}Review`);
-  const list = $(`${kind}ReviewList`);
-  if (!panel || !list) return;
-
-  const features = result?.features || [];
-  panel.hidden = !features.length;
-  if (!features.length) {
-    list.innerHTML = "";
-    return;
-  }
-
-  list.innerHTML = features
-    .map((feature, index) => {
-      const guide = guideForFeature(feature);
-      const confidence = Math.round((feature.confidence ?? 0) * 100);
-      const status =
-        feature.included === false
-          ? "已排除"
-          : feature.reviewStatus === "confirmed"
-            ? "已确认"
-            : feature.needsReview
-              ? "待复核"
-              : "已保留";
-      const statusClass = feature.included === false ? "excluded" : feature.reviewStatus === "confirmed" ? "confirmed" : "pending";
-      const evidence = feature.evidence || "AI 只识别到大概位置";
-      return `
-        <article class="review-item ${feature.included === false ? "is-excluded" : ""}">
-          <div class="review-main">
-            <strong>${escapeHtml(guide.label)}</strong>
-            <span class="${statusClass}">${status} · AI把握 ${confidence}%</span>
-            <p>${escapeHtml(evidence)}</p>
-          </div>
-          <div class="review-actions">
-            <button type="button" data-kind="${kind}" data-index="${index}" data-action="confirm">确认</button>
-            <button type="button" data-kind="${kind}" data-index="${index}" data-action="edit">${feature.editing ? "收起" : "修改"}</button>
-            <button type="button" data-kind="${kind}" data-index="${index}" data-action="${feature.included === false ? "restore" : "exclude"}">${feature.included === false ? "恢复" : "排除"}</button>
-          </div>
-          ${
-            feature.editing
-              ? `
-                <div class="review-editor">
-                  <label>
-                    改成正确的线/部位
-                    <select data-edit-field="featureId">
-                      ${featureOptions(kind, feature.featureId)}
-                    </select>
-                  </label>
-                  <p>用户只纠正识别位置，说明和建议仍由 AI 自动生成。</p>
-                  <button type="button" data-kind="${kind}" data-index="${index}" data-action="save">保存纠正</button>
-                </div>
-              `
-              : ""
-          }
-        </article>
-      `;
-    })
-    .join("");
-};
-
-const updateReviewStatus = (kind, index, action) => {
-  const result = state[`${kind}Result`];
-  const feature = result?.features?.[index];
-  if (!feature) return;
-
-  if (action === "exclude") {
-    feature.included = false;
-    feature.reviewStatus = "excluded";
-  } else if (action === "restore") {
-    feature.included = true;
-    feature.reviewStatus = feature.needsReview ? "pending" : "kept";
-  } else if (action === "confirm") {
-    feature.included = true;
-    feature.reviewStatus = "confirmed";
-  } else if (action === "edit") {
-    feature.editing = !feature.editing;
-  }
-
-  drawMarks(kind, result);
-  renderReview(kind);
-  const summary = reviewSummary(result);
-  setMessage(`${kind}Status`, `已保留 ${summary.kept} 个，排除 ${summary.excluded} 个`);
-};
-
-const featureOptions = (kind, selectedId) => {
-  const palmOptions = [
-    ["life_line", "生命线"],
-    ["head_line", "智慧线"],
-    ["heart_line", "感情线"],
-    ["fate_line", "事业线"],
-    ["marriage_line", "婚姻线"],
-    ["palm_shape", "手型和掌色"],
-    ["five_fingers", "手指长短和指缝"],
-    ["moles_veins", "痣、青筋和颜色"],
-    ["special_shapes", "特殊纹路"],
-  ];
-  const faceOptions = [
-    ["forehead", "额头"],
-    ["yintang", "印堂"],
-    ["brows", "眉毛"],
-    ["eyes", "眼睛"],
-    ["nose_root", "山根"],
-    ["nose_tip", "鼻子"],
-    ["philtrum", "人中"],
-    ["mouth", "嘴唇"],
-    ["law_lines", "法令纹"],
-    ["ears", "耳朵"],
-    ["chin", "下巴"],
-    ["moles_scars_qi", "痣疤和气色"],
-  ];
-  const options = kind === "face" ? faceOptions : palmOptions;
-  return options
-    .map(([value, label]) => `<option value="${value}" ${value === selectedId ? "selected" : ""}>${label}</option>`)
-    .join("");
-};
-
-const applyFeatureCorrection = (kind, feature, featureId) => {
-  const guide = featureGuides[featureId];
-  if (!guide) return;
-  feature.featureId = featureId;
-  feature.name = guide.label;
-  feature.category = kind === "face" ? "用户纠正的面部位置" : "用户纠正的手掌位置";
-  feature.plainSummary = "";
-  feature.advice = "";
-  feature.evidence = `用户将此项纠正为：${guide.label}`;
-};
-
-const saveReviewEdit = (kind, index, button) => {
-  const result = state[`${kind}Result`];
-  const feature = result?.features?.[index];
-  const editor = button.closest(".review-editor");
-  if (!feature || !editor) return;
-
-  const select = editor.querySelector('[data-edit-field="featureId"]');
-  applyFeatureCorrection(kind, feature, select?.value || feature.featureId);
-
-  feature.included = true;
-  feature.needsReview = false;
-  feature.reviewStatus = "confirmed";
-  feature.editing = false;
-  drawMarks(kind, result);
-  renderReview(kind);
-  setMessage(`${kind}Status`, "已保存用户纠正，说明和建议将由 AI 自动生成");
-};
-
-const analyze = async (kind) => {
+const analyze = async (kind, userCorrection = "") => {
   const image = state[`${kind}Image`];
   if (!image) {
     setMessage(`${kind}Status`, "请先选择图片。", true);
@@ -365,15 +215,16 @@ const analyze = async (kind) => {
   }
 
   const label = kind === "palm" ? "手掌照片" : "面部照片";
-  setMessage(`${kind}Status`, `AI 正在分析${label}...`);
+  setMessage(`${kind}Status`, userCorrection ? `AI 正在按你的反馈重新分析${label}...` : `AI 正在分析${label}...`);
   try {
     const result = await api(`/api/analyze/${kind}`, {
       imageDataUrl: image.dataUrl,
       imageMeta: { width: image.width, height: image.height },
+      userCorrection,
     });
-    state[`${kind}Result`] = prepareReview(kind, result);
+    state[`${kind}Result`] = result;
     drawMarks(kind, state[`${kind}Result`]);
-    renderReview(kind);
+    showCorrection(kind);
     const count = state[`${kind}Result`].features?.length || 0;
     const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
     const reviewCount = state[`${kind}Result`].features?.filter((feature) => feature.needsReview).length || 0;
@@ -381,7 +232,7 @@ const analyze = async (kind) => {
       kind === "palm" && reviewCount
         ? `已标出 ${count} 个候选位置，掌纹太淡的线已改为候选区`
         : `已标出 ${count} 个位置`;
-    setMessage(`${kind}Status`, count ? doneText : emptyTip, !count);
+    setMessage(`${kind}Status`, count ? `${doneText}${userCorrection ? "，已参考你的反馈" : ""}` : emptyTip, !count);
     if (typeof result.remaining === "number") {
       $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
     }
@@ -404,10 +255,7 @@ const birthPayload = () => ({
 const reviewedResult = (kind) => {
   const result = state[`${kind}Result`];
   if (!result) return null;
-  return {
-    ...result,
-    features: activeFeatures(result).map(({ editing, localId, ...feature }) => feature),
-  };
+  return result;
 };
 
 const featureGuides = {
@@ -717,19 +565,18 @@ const clearAll = () => {
     $(`${kind}Stage`).style.removeProperty("aspect-ratio");
     $(`${kind}Empty`).hidden = false;
     $(`${kind}Marks`).innerHTML = "";
-    clearReview(kind);
+    clearCorrection(kind);
     setMessage(`${kind}Status`, "");
   }
 };
 
-const handleReviewClick = (event) => {
-  const button = event.target.closest("button[data-action]");
-  if (!button) return;
-  if (button.dataset.action === "save") {
-    saveReviewEdit(button.dataset.kind, Number(button.dataset.index), button);
+const reanalyzeWithCorrection = (kind) => {
+  const correction = $(`${kind}Correction`).value.trim();
+  if (!correction) {
+    setMessage(`${kind}Status`, "先简单写一句哪里不对。", true);
     return;
   }
-  updateReviewStatus(button.dataset.kind, Number(button.dataset.index), button.dataset.action);
+  analyze(kind, correction);
 };
 
 $("unlockButton").addEventListener("click", unlock);
@@ -740,8 +587,8 @@ $("palmImage").addEventListener("change", (event) => loadImage("palm", event.tar
 $("faceImage").addEventListener("change", (event) => loadImage("face", event.target.files[0]));
 $("analyzePalm").addEventListener("click", () => analyze("palm"));
 $("analyzeFace").addEventListener("click", () => analyze("face"));
-$("palmReview").addEventListener("click", handleReviewClick);
-$("faceReview").addEventListener("click", handleReviewClick);
+$("reanalyzePalm").addEventListener("click", () => reanalyzeWithCorrection("palm"));
+$("reanalyzeFace").addEventListener("click", () => reanalyzeWithCorrection("face"));
 $("readingForm").addEventListener("submit", submitReport);
 $("fillDemo").addEventListener("click", fillDemo);
 $("clearAll").addEventListener("click", clearAll);

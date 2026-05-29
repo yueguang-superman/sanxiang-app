@@ -134,12 +134,13 @@
                   <button id="analyzePalm" type="button">分析手掌照片</button>
                   <span id="palmStatus" class="mini"></span>
                 </div>
-                <div class="review-panel" id="palmReview" hidden>
-                  <div class="review-head">
-                    <strong>审核识别结果</strong>
-                    <span>不准的点可以排除，报告不会使用</span>
+                <div class="correction-panel" id="palmCorrectionPanel" hidden>
+                  <div class="correction-head">
+                    <strong>觉得标错了？</strong>
+                    <span>简单说哪里不对，AI 会自己重标</span>
                   </div>
-                  <div class="review-list" id="palmReviewList"></div>
+                  <textarea id="palmCorrection" placeholder="例如：生命线画太直了；事业线不是那里；婚姻线看不清先别标"></textarea>
+                  <button id="reanalyzePalm" type="button">按我的反馈重新分析</button>
                 </div>
               </article>
 
@@ -163,12 +164,13 @@
                   <button id="analyzeFace" type="button">分析面部照片</button>
                   <span id="faceStatus" class="mini"></span>
                 </div>
-                <div class="review-panel" id="faceReview" hidden>
-                  <div class="review-head">
-                    <strong>审核识别结果</strong>
-                    <span>不准的点可以排除，报告不会使用</span>
+                <div class="correction-panel" id="faceCorrectionPanel" hidden>
+                  <div class="correction-head">
+                    <strong>觉得标错了？</strong>
+                    <span>简单说哪里不对，AI 会自己重标</span>
                   </div>
-                  <div class="review-list" id="faceReviewList"></div>
+                  <textarea id="faceCorrection" placeholder="例如：印堂框太大了；耳朵不需要标；山根位置错了"></textarea>
+                  <button id="reanalyzeFace" type="button">按我的反馈重新分析</button>
                 </div>
               </article>
             </div>

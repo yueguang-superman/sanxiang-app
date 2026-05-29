@@ -12,6 +12,7 @@ export const onRequestPost = async ({ request, env }) => {
       kind: "palm",
       imageDataUrl: body.imageDataUrl,
       imageMeta: body.imageMeta,
+      userCorrection: body.userCorrection,
       env,
     });
     return json({ ...result, remaining: access.remaining });
