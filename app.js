@@ -142,6 +142,34 @@ const traceScore = (points) => {
   };
 };
 
+const curveControl = (current, previous, next, reverse = false) => {
+  const before = previous || current;
+  const after = next || current;
+  const direction = reverse ? -1 : 1;
+  const smoothness = 0.18;
+  return {
+    x: current.x + direction * (after.x - before.x) * smoothness,
+    y: current.y + direction * (after.y - before.y) * smoothness,
+  };
+};
+
+const smoothPath = (points) => {
+  if (points.length < 2) return "";
+  if (points.length === 2) {
+    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  }
+
+  const commands = [`M ${points[0].x} ${points[0].y}`];
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const controlStart = curveControl(start, points[index - 2], end);
+    const controlEnd = curveControl(end, start, points[index + 1], true);
+    commands.push(`C ${controlStart.x} ${controlStart.y} ${controlEnd.x} ${controlEnd.y} ${end.x} ${end.y}`);
+  }
+  return commands.join(" ");
+};
+
 const canDrawTrace = (kind, feature, points) => {
   if (kind !== "palm") {
     return false;
@@ -150,8 +178,23 @@ const canDrawTrace = (kind, feature, points) => {
     return points.length >= 3 && !feature.needsReview && (feature.confidence ?? 0) >= 0.7;
   }
   const score = traceScore(points);
-  const minPoints = feature.featureId === "marriage_line" ? 2 : 3;
-  return points.length >= minPoints && score.length >= 4 && score.maxSegment <= 26 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
+  const minPointsByFeature = {
+    life_line: 5,
+    head_line: 5,
+    heart_line: 5,
+    fate_line: 3,
+    marriage_line: 2,
+  };
+  const maxSegmentByFeature = {
+    life_line: 18,
+    head_line: 18,
+    heart_line: 18,
+    fate_line: 22,
+    marriage_line: 12,
+  };
+  const minPoints = minPointsByFeature[feature.featureId] || 4;
+  const maxSegment = maxSegmentByFeature[feature.featureId] || 18;
+  return points.length >= minPoints && score.length >= 4 && score.maxSegment <= maxSegment && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
 };
 
 const activeFeatures = (result) => (result?.features || []).filter((feature) => feature.included !== false);
@@ -180,9 +223,9 @@ const drawMarks = (kind, result) => {
 
     if (drawableSegments.length) {
       for (const segment of drawableSegments) {
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
         line.setAttribute("class", "mark-line");
-        line.setAttribute("points", segment.map((point) => `${point.x},${point.y}`).join(" "));
+        line.setAttribute("d", smoothPath(segment));
         group.append(line);
       }
     } else {
