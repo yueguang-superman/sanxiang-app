@@ -63,13 +63,13 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
   const catalog = catalogFor(kind);
   const names = catalog.map((item) => `${item.id}:${item.name}`).join("；");
   const palmGuide =
-    "这是手掌识别。先判断图片是否清楚、是否为完整掌心。最优先标注普通人能看懂的线：生命线、智慧线、感情线、事业线、婚姻线；然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫等。生命线/智慧线/感情线/事业线/婚姻线必须尽量返回 points，points 是沿着掌纹走势的 3-8 个百分比坐标点，用来画线。";
+    "这是手掌识别。先判断图片是否清楚、是否为完整掌心。最优先标注普通人能看懂的线：生命线、智慧线、感情线、事业线、婚姻线；然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫等。生命线/智慧线/感情线/事业线/婚姻线必须尽量返回 points，points 是沿着掌纹走势的 3-8 个百分比坐标点，用来画线。name 必须用普通名称，例如“生命线”，不要只写“地纹”。";
   const faceGuide =
-    "这是面部识别。先判断图片是否为清楚正脸。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。";
+    "这是面部识别。先判断图片是否为清楚正脸。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。name 必须用普通名称。";
   const prompt =
     `你是图像识别助手，任务是给传统文化测算软件做可视化标注，语言要让普通用户看懂。${kind === "palm" ? palmGuide : faceGuide}` +
     `必须只返回 JSON，不要解释。可选特征库：${names}。` +
-    `返回格式：{"features":[{"featureId":"life_line","name":"生命线","category":"主要掌纹","points":[{"x":28,"y":45},{"x":22,"y":60},{"x":25,"y":82}],"box":{"x":18,"y":40,"width":22,"height":42},"confidence":0.82,"evidence":"拇指根部外侧弧线清楚","needsReview":false}],"imageQuality":"clear|blurry|partial","notes":["..."]}。` +
+    `返回格式：{"features":[{"featureId":"life_line","name":"生命线","category":"主要掌纹","points":[{"x":28,"y":45},{"x":22,"y":60},{"x":25,"y":82}],"box":{"x":18,"y":40,"width":22,"height":42},"confidence":0.82,"evidence":"拇指根部外侧弧线清楚","plainSummary":"简单说，看精力、稳定度和恢复力，不是看寿命。","advice":"近期注意规律作息，重要决定别硬撑。","needsReview":false}],"imageQuality":"clear|blurry|partial","notes":["..."]}。` +
     `box 和 points 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，confidence 低于 0.55 且 needsReview=true。`;
 
   const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
@@ -129,6 +129,8 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
         box: feature.box || fallbackBox(index),
         confidence: Math.max(0, Math.min(1, confidence)),
         evidence: String(feature.evidence || ""),
+        plainSummary: String(feature.plainSummary || ""),
+        advice: String(feature.advice || ""),
         needsReview: Boolean(feature.needsReview || confidence < 0.58),
         interpretation: known.interpretation,
         sourceTitle: known.sourceTitle,

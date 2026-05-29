@@ -194,6 +194,174 @@ const birthPayload = () => ({
   birthPlace: $("birthPlace").value.trim(),
 });
 
+const featureGuides = {
+  life_line: {
+    label: "生命线",
+    plain: "简单说：看一个人的精力、恢复力和生活稳定度，不是直接看寿命。",
+    advice: "建议：如果线条有断续或杂纹，就把它当作“最近别硬扛”的提醒，规律作息、少透支体力。",
+  },
+  head_line: {
+    label: "智慧线",
+    plain: "简单说：看思路、判断力、学习能力和做事方式。",
+    advice: "建议：线清楚就适合把想法落到计划；线乱或断续时，重要决定先写下来、隔天再定。",
+  },
+  heart_line: {
+    label: "感情线",
+    plain: "简单说：看情绪表达、人际关系和感情稳定度。",
+    advice: "建议：感情线杂乱时，别急着用情绪做决定，先把话说清楚，减少误会。",
+  },
+  fate_line: {
+    label: "事业线",
+    plain: "简单说：看事业方向、目标感和阶段变化。",
+    advice: "建议：事业线断续时，不代表不好，而是适合分阶段推进，先稳住一个主方向。",
+  },
+  marriage_line: {
+    label: "婚姻线",
+    plain: "简单说：看感情关系的节奏和稳定感，不能单独断婚姻好坏。",
+    advice: "建议：如果线浅或分叉，只当作沟通提醒，感情问题要看现实相处，别只看一条线。",
+  },
+  palm_shape: {
+    label: "手型和掌色",
+    plain: "简单说：看整体状态。掌色红润、手型舒展，一般代表当前气色和精神状态更稳。",
+    advice: "建议：掌色发暗或偏青时，先从休息、饮食、运动调整，不要过度解读。",
+  },
+  five_fingers: {
+    label: "手指长短和指缝",
+    plain: "简单说：看做事风格、花钱习惯和人际边界。",
+    advice: "建议：指缝大可以提醒自己记账和控制冲动消费；手指紧也要注意别太保守。",
+  },
+  nails: {
+    label: "指甲状态",
+    plain: "简单说：看近期身体状态的参考，比如疲劳、压力、营养状态。",
+    advice: "建议：指甲异常不要当命理结论，长期明显异常更适合去做健康检查。",
+  },
+  mingtang: {
+    label: "掌心区域",
+    plain: "简单说：看内心压力和事情是否缠得多。",
+    advice: "建议：掌心杂纹多时，适合给事情分优先级，先处理最重要的三件事。",
+  },
+  bagong: {
+    label: "手掌分区",
+    plain: "简单说：这是传统手相里的辅助区域，用来配合主要掌纹看方向。",
+    advice: "建议：分区只能辅助，真正重点还是生命线、智慧线、感情线、事业线、婚姻线。",
+  },
+  simian_line: {
+    label: "断掌",
+    plain: "简单说：代表做事容易集中、较有冲劲，但也可能比较固执。",
+    advice: "建议：有冲劲是优势，但遇到大事要多听一个外部意见，避免一条路走到底。",
+  },
+  six_success: {
+    label: "成功线",
+    plain: "简单说：看表现力、名气、技能成果和被看见的机会。",
+    advice: "建议：如果成功线清楚，适合主动展示作品和能力；如果不明显，就先积累可展示成果。",
+  },
+  noble_line: {
+    label: "贵人纹",
+    plain: "简单说：看外部帮助、人缘助力和遇到支持者的机会。",
+    advice: "建议：别只等贵人，主动维护关系、表达需求，助力才更容易出现。",
+  },
+  wealth_marks: {
+    label: "财运纹",
+    plain: "简单说：看理财意识、赚钱机会和守财能力的参考。",
+    advice: "建议：有财运纹也要靠预算和执行；没有也不代表没财，关键是稳定收入和少乱花。",
+  },
+  special_shapes: {
+    label: "特殊纹路",
+    plain: "简单说：岛纹、三角纹、井字纹这些属于额外提醒，要看出现在哪里。",
+    advice: "建议：特殊纹不要单独下结论，必须和主要掌纹、八字、面部一起看。",
+  },
+  moles_veins: {
+    label: "痣、青筋和颜色",
+    plain: "简单说：看局部状态和近期压力，更多是提醒项。",
+    advice: "建议：明显青筋、色暗或变化很快时，先关注身体状态，必要时做现实检查。",
+  },
+  forehead: {
+    label: "额头",
+    plain: "简单说：看早年状态、思路开阔度和外在精神面貌。",
+    advice: "建议：额头有疤痕或暗沉时，报告里只作提醒，不要单独判断运势。",
+  },
+  yintang: {
+    label: "印堂",
+    plain: "简单说：看近期精神压力、心情和做事是否顺畅。",
+    advice: "建议：印堂暗或有杂纹时，先减少焦虑源，把睡眠和节奏调回来。",
+  },
+  tiancang: {
+    label: "太阳穴附近",
+    plain: "简单说：看资源、人脉和积累能力的参考。",
+    advice: "建议：这里不饱满或有痣疤时，建议稳住现金流，别轻易做大额冒险。",
+  },
+  jiamen: {
+    label: "夫妻宫",
+    plain: "简单说：看感情关系和伴侣相处状态的参考。",
+    advice: "建议：有痣疤或暗沉时，不要吵着定输赢，多做沟通和边界管理。",
+  },
+  leitang: {
+    label: "下眼睑",
+    plain: "简单说：看情绪、睡眠和亲密关系里的消耗感。",
+    advice: "建议：如果浮肿或暗沉明显，先从休息、少熬夜、少内耗开始。",
+  },
+  brows: {
+    label: "眉毛",
+    plain: "简单说：看性格表达、人际关系和行动脾气。",
+    advice: "建议：眉形杂乱时，提醒自己说话慢一点，处理关系别太冲。",
+  },
+  eyes: {
+    label: "眼神",
+    plain: "简单说：看精神状态、专注力和当前气场。",
+    advice: "建议：眼神疲惫或散时，先休息；状态没恢复前少做高风险决定。",
+  },
+  nose_root: {
+    label: "山根",
+    plain: "简单说：看压力承接、抗压能力和中间阶段的稳定性。",
+    advice: "建议：这里暗沉或有纹时，适合把压力拆小，不要什么都自己扛。",
+  },
+  nose_tip: {
+    label: "鼻子",
+    plain: "简单说：传统里常拿它看财务观念和资源掌控。",
+    advice: "建议：鼻翼薄或鼻孔明显时，提醒自己做好预算，别情绪消费。",
+  },
+  philtrum: {
+    label: "人中",
+    plain: "简单说：看承接力、耐力和生活节奏。",
+    advice: "建议：人中浅或歪时，只作状态提醒，先把规律生活做好。",
+  },
+  mouth: {
+    label: "嘴唇",
+    plain: "简单说：看表达、食禄和对外沟通。",
+    advice: "建议：唇色暗或嘴角下垂时，先关注疲劳和情绪，也要注意表达方式。",
+  },
+  law_lines: {
+    label: "法令纹",
+    plain: "简单说：看责任感、规则感和承担事情的能力。",
+    advice: "建议：法令深不一定坏，适合把经验变成方法；断裂或开叉时少硬撑。",
+  },
+  ears: {
+    label: "耳朵",
+    plain: "简单说：看基础、听取意见和稳定感。",
+    advice: "建议：耳形只作参考，现实里更重要的是多听有效建议、少冲动。",
+  },
+  chin: {
+    label: "下巴",
+    plain: "简单说：看后劲、稳定度和生活承载。",
+    advice: "建议：下巴弱或尖时，适合提前做长期规划，别只看眼前。",
+  },
+  moles_scars_qi: {
+    label: "痣疤和气色",
+    plain: "简单说：这是额外提醒项，代表某个部位需要重点看。",
+    advice: "建议：痣疤气色不要单独断事，结合位置、八字和现实情况再看。",
+  },
+};
+
+const guideForFeature = (feature) => {
+  const key = feature.featureId;
+  const guide = featureGuides[key] || {};
+  return {
+    label: guide.label || feature.name || "识别位置",
+    plain: guide.plain || feature.plainSummary || "简单说：AI 看到了这个位置，但需要结合其他信息一起判断。",
+    advice: guide.advice || feature.advice || "建议：把它当作提醒，不要只凭一个点下结论。",
+  };
+};
+
 const renderFeatureList = (title, result) => {
   const features = result?.features || [];
   if (!features.length) {
@@ -202,11 +370,22 @@ const renderFeatureList = (title, result) => {
   const items = features
     .map((feature) => {
       const confidence = Math.round((feature.confidence ?? 0) * 100);
-      const review = feature.needsReview ? "，待复核" : "";
-      return `<li><strong>${escapeHtml(feature.name)}</strong>：${escapeHtml(feature.evidence || feature.interpretation || "已识别到这个位置")} <span class="mini">可信度 ${confidence}%${review}</span></li>`;
+      const review = feature.needsReview ? "，建议复核照片" : "";
+      const guide = guideForFeature(feature);
+      return `
+        <article class="feature-item">
+          <div class="feature-title">
+            <strong>${escapeHtml(guide.label)}</strong>
+            <span>AI把握 ${confidence}%${review}</span>
+          </div>
+          <p>${escapeHtml(guide.plain)}</p>
+          <p><b>建议：</b>${escapeHtml(guide.advice.replace(/^建议：/, ""))}</p>
+          <p class="feature-evidence"><b>AI看到：</b>${escapeHtml(feature.evidence || feature.name || "已识别到这个位置")}</p>
+        </article>
+      `;
     })
     .join("");
-  return `<section class="report-section"><h3>${title}</h3><ul>${items}</ul></section>`;
+  return `<section class="report-section"><h3>${title}</h3><div class="feature-list">${items}</div></section>`;
 };
 
 const renderReport = (report) => {

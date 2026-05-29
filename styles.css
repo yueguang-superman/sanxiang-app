@@ -496,6 +496,46 @@ button.primary {
   line-height: 1.75;
 }
 
+.feature-list {
+  display: grid;
+  gap: 12px;
+}
+
+.feature-item {
+  padding: 13px;
+  border: 1px solid rgba(214, 169, 79, 0.2);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.feature-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.feature-title strong {
+  color: #fff2c9;
+  font-size: 18px;
+}
+
+.feature-title span,
+.feature-evidence {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.feature-item p {
+  margin: 7px 0 0;
+  line-height: 1.72;
+}
+
+.feature-evidence {
+  padding-top: 6px;
+  border-top: 1px solid rgba(214, 169, 79, 0.14);
+}
+
 .pillar-row,
 .pill-row,
 .element-bars {
