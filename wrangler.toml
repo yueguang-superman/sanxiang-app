@@ -3,7 +3,7 @@ compatibility_date = "2026-05-29"
 pages_build_output_dir = "."
 
 [vars]
-DAILY_LIMIT = "3"
+DAILY_LIMIT = "10"
 AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 AI_MODEL = "qwen3.6-flash"
 

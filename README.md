@@ -17,7 +17,7 @@
 3. Build command 留空，Build output directory 填 `.`。
 4. 在 Cloudflare Pages 的 Settings -> Environment variables 配置：
    - `ACCESS_CODE`：共享访问码。
-   - `DAILY_LIMIT`：每日次数，比如 `3`。
+   - `DAILY_LIMIT`：每日次数，比如 `10`。
    - `AI_API_KEY`：通义千问 / 阿里云百炼 API Key。
    - `AI_BASE_URL`：默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`，可不改。
    - `AI_MODEL`：默认 `qwen3.6-flash`，低成本优先；需要更强效果时再换更高阶视觉模型。
