@@ -86,6 +86,7 @@ const loadImage = async (kind, file) => {
   state[`${kind}Result`] = null;
 
   const preview = $(`${kind}Preview`);
+  $(`${kind}Stage`).style.aspectRatio = `${image.width} / ${image.height}`;
   preview.src = image.dataUrl;
   preview.hidden = false;
   $(`${kind}Empty`).hidden = true;
@@ -120,6 +121,27 @@ const normalizePoint = (point = {}) => ({
   y: Math.max(0, Math.min(100, Number(point.y ?? 0))),
 });
 
+const palmMainLineIds = new Set(["life_line", "head_line", "heart_line", "fate_line", "marriage_line"]);
+
+const pointDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const traceScore = (points) => {
+  if (points.length < 2) return { length: 0, maxSegment: 0 };
+  const segments = points.slice(1).map((point, index) => pointDistance(points[index], point));
+  return {
+    length: segments.reduce((sum, value) => sum + value, 0),
+    maxSegment: Math.max(...segments),
+  };
+};
+
+const canDrawTrace = (kind, feature, points) => {
+  if (kind !== "palm" || !palmMainLineIds.has(feature.featureId)) {
+    return points.length >= 2 && !feature.needsReview;
+  }
+  const score = traceScore(points);
+  return points.length >= 4 && score.length >= 14 && score.maxSegment <= 32 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
+};
+
 const drawMarks = (kind, result) => {
   const svg = $(`${kind}Marks`);
   svg.innerHTML = "";
@@ -128,15 +150,16 @@ const drawMarks = (kind, result) => {
     const box = normalizeBox(feature.box);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const points = (feature.points || []).map(normalizePoint).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    const shouldDrawTrace = canDrawTrace(kind, feature, points);
 
-    if (points.length >= 2) {
+    if (shouldDrawTrace) {
       const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
       line.setAttribute("class", "mark-line");
       line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
       group.append(line);
     } else {
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("class", "mark-box");
+      rect.setAttribute("class", feature.needsReview ? "mark-box mark-candidate" : "mark-box");
       rect.setAttribute("x", box.x);
       rect.setAttribute("y", box.y);
       rect.setAttribute("width", box.width);
@@ -147,9 +170,9 @@ const drawMarks = (kind, result) => {
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("class", "mark-label");
-    label.setAttribute("x", Math.min(94, points[0]?.x ?? box.x + 1));
-    label.setAttribute("y", Math.max(5, (points[0]?.y ?? box.y) - 1));
-    label.textContent = feature.name || feature.featureId || "特殊点";
+    label.setAttribute("x", Math.min(94, shouldDrawTrace ? points[0].x : box.x + 1));
+    label.setAttribute("y", Math.max(5, (shouldDrawTrace ? points[0].y : box.y) - 1));
+    label.textContent = `${feature.name || feature.featureId || "特殊点"}${feature.needsReview ? "候选" : ""}`;
 
     group.append(label);
     svg.append(group);
@@ -174,7 +197,12 @@ const analyze = async (kind) => {
     drawMarks(kind, result);
     const count = result.features?.length || 0;
     const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
-    setMessage(`${kind}Status`, count ? `已标出 ${count} 个位置` : emptyTip, !count);
+    const reviewCount = result.features?.filter((feature) => feature.needsReview).length || 0;
+    const doneText =
+      kind === "palm" && reviewCount
+        ? `已标出 ${count} 个候选位置，掌纹太淡的线已改为候选区`
+        : `已标出 ${count} 个位置`;
+    setMessage(`${kind}Status`, count ? doneText : emptyTip, !count);
     if (typeof result.remaining === "number") {
       $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
     }
@@ -477,6 +505,7 @@ const clearAll = () => {
     state[`${kind}Result`] = null;
     $(`${kind}Preview`).hidden = true;
     $(`${kind}Preview`).removeAttribute("src");
+    $(`${kind}Stage`).style.removeProperty("aspect-ratio");
     $(`${kind}Empty`).hidden = false;
     $(`${kind}Marks`).innerHTML = "";
     setMessage(`${kind}Status`, "");

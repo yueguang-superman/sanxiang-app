@@ -382,7 +382,7 @@ button.primary {
 
 .mark-stage img {
   width: 100%;
-  height: 100%;
+  height: auto;
   max-height: 520px;
   object-fit: contain;
   display: block;
@@ -404,13 +404,19 @@ button.primary {
 .mark-box {
   fill: rgba(214, 169, 79, 0.09);
   stroke: #f3d58b;
-  stroke-width: 0.45;
+  stroke-width: 0.38;
+}
+
+.mark-candidate {
+  fill: rgba(214, 169, 79, 0.035);
+  stroke-dasharray: 1.2 1;
+  opacity: 0.72;
 }
 
 .mark-line {
   fill: none;
   stroke: #ffe28a;
-  stroke-width: 0.9;
+  stroke-width: 0.48;
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
@@ -418,10 +424,10 @@ button.primary {
 
 .mark-label {
   fill: #fff7dd;
-  font: 3.5px "PingFang SC", sans-serif;
+  font: 2.8px "PingFang SC", sans-serif;
   paint-order: stroke;
   stroke: rgba(0, 0, 0, 0.75);
-  stroke-width: 0.65px;
+  stroke-width: 0.5px;
 }
 
 .actions {
