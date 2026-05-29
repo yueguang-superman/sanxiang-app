@@ -20,7 +20,8 @@
    - `DAILY_LIMIT`：每日次数，比如 `20`。
    - `AI_API_KEY`：通义千问 / 阿里云百炼 API Key。
    - `AI_BASE_URL`：默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`，可不改。
-   - `AI_MODEL`：默认 `qwen3-vl-plus`，用于图片识别。必须选择支持图片输入的模型。
+   - `AI_VISION_MODEL`：默认 `qwen3-vl-plus`，用于图片识别。必须选择支持图片输入的模型。
+   - `AI_REPORT_MODEL`：默认 `qwen3.7-max`，用于把报告写成大白话总结和建议。
 5. 建议创建 Cloudflare KV，并绑定为 `RATE_LIMIT_KV`，用于稳定记录每日限次。
 
 ## 通义千问配置
@@ -28,12 +29,13 @@
 本项目默认走阿里云百炼 DashScope 的 OpenAI 兼容接口：
 
 - `AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`
-- `AI_MODEL=qwen3-vl-plus`
+- `AI_VISION_MODEL=qwen3-vl-plus`
+- `AI_REPORT_MODEL=qwen3.7-max`
 - `AI_API_KEY=你的百炼 API Key`
 
 不要把 `AI_API_KEY` 写进前端代码或 GitHub 仓库。请只放在 Cloudflare Pages 的环境变量或 Secret 里。
 
-如果百炼后台确认你的账号可以调用更高阶的全模态模型，可以把 `AI_MODEL` 改成对应模型名。注意：纯文字模型不能识别手掌图片；比如只擅长文字的 Max 模型不适合做手掌标注。如果想省钱，可以改成 `qwen3-vl-flash`。
+图片识别和报告撰写分开配置：手掌、面部定位用视觉模型；报告总结用 Max 模型。如果想省钱，可以把 `AI_VISION_MODEL` 改成 `qwen3-vl-flash`。
 
 ## 拍照建议
 

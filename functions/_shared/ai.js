@@ -138,3 +138,56 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
     }),
   };
 };
+
+const summarizeFeatures = (result) =>
+  (result?.features || []).slice(0, 10).map((feature) => ({
+    name: feature.name,
+    category: feature.category,
+    confidence: feature.confidence,
+    evidence: feature.evidence,
+    plainSummary: feature.plainSummary,
+    advice: feature.advice,
+    needsReview: feature.needsReview,
+  }));
+
+export const generatePlainReading = async ({ bazi, palm, face, env }) => {
+  if (!env.AI_API_KEY) return null;
+
+  const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  const model = env.AI_REPORT_MODEL || "qwen3.7-max";
+  const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
+  const input = {
+    baziSummary: bazi.summary,
+    baziElements: bazi.elements,
+    palmFeatures: summarizeFeatures(palm),
+    faceFeatures: summarizeFeatures(face),
+  };
+  const prompt =
+    "你是传统文化测算报告助手。请把输入内容总结成普通人听得懂的话，并给出实用建议。" +
+    "要求：不要吓人，不要绝对化，不要说医学/投资结论；少用术语，必要术语要解释成人话。" +
+    "输出必须是 JSON：{\"reading\":[\"一句结论或建议\",...]}。" +
+    "reading 输出 5 条，每条 35-70 个中文字符，语气像认真给朋友提醒。输入：" +
+    JSON.stringify(input);
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.AI_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.35,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  const content = payload.choices?.[0]?.message?.content;
+  const parsed = parseJson(content);
+  return Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : null;
+};

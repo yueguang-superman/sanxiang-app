@@ -357,8 +357,8 @@ const guideForFeature = (feature) => {
   const guide = featureGuides[key] || {};
   return {
     label: guide.label || feature.name || "识别位置",
-    plain: guide.plain || feature.plainSummary || "简单说：AI 看到了这个位置，但需要结合其他信息一起判断。",
-    advice: guide.advice || feature.advice || "建议：把它当作提醒，不要只凭一个点下结论。",
+    plain: feature.plainSummary || guide.plain || "简单说：AI 看到了这个位置，但需要结合其他信息一起判断。",
+    advice: feature.advice || guide.advice || "建议：把它当作提醒，不要只凭一个点下结论。",
   };
 };
 

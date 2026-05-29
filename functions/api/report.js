@@ -1,4 +1,5 @@
 import { requireAccess } from "../_shared/auth.js";
+import { generatePlainReading } from "../_shared/ai.js";
 import { calculateBazi } from "../_shared/bazi.js";
 import { json, readJson } from "../_shared/http.js";
 
@@ -32,13 +33,14 @@ export const onRequestPost = async ({ request, env }) => {
     const bazi = calculateBazi(body.birth || {});
     const palm = body.palm || { features: [] };
     const face = body.face || { features: [] };
+    const aiReading = await generatePlainReading({ bazi, palm, face, env }).catch(() => null);
     return json({
       subject: body.birth?.personName || "求测者",
       bazi,
       palm,
       face,
       score: scoreFrom(bazi, palm, face),
-      reading: buildReading(bazi, palm, face),
+      reading: aiReading?.length ? aiReading : buildReading(bazi, palm, face),
       remaining: access.remaining,
     });
   } catch (error) {
