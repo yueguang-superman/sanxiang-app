@@ -136,8 +136,11 @@ const traceScore = (points) => {
 };
 
 const canDrawTrace = (kind, feature, points) => {
-  if (kind !== "palm" || !palmMainLineIds.has(feature.featureId)) {
-    return points.length >= 2 && !feature.needsReview;
+  if (kind !== "palm") {
+    return false;
+  }
+  if (!palmMainLineIds.has(feature.featureId)) {
+    return points.length >= 3 && !feature.needsReview && (feature.confidence ?? 0) >= 0.7;
   }
   const score = traceScore(points);
   return points.length >= 4 && score.length >= 14 && score.maxSegment <= 32 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;

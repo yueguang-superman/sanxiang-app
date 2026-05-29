@@ -67,7 +67,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
   const palmGuide =
     "这是手掌识别。先判断图片是否清楚、是否为完整掌心。最优先标注普通人能看懂的线：生命线、智慧线、感情线、事业线、婚姻线；然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫等。生命线/智慧线/感情线/事业线/婚姻线如果能看清，必须返回 4-8 个 points，points 要逐点贴着真实掌纹走，不能按想象模板画线；如果纹路很淡、被光照盖住、只能猜大概位置，就不要返回 points，只返回 box，并把 needsReview 设为 true。name 必须用普通名称，例如“生命线”，不要只写“地纹”。";
   const faceGuide =
-    "这是面部识别。先判断图片是否为清楚正脸。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。name 必须用普通名称。";
+    "这是面部识别。先判断图片是否为清楚正脸。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。面部只返回 box，不要返回 points，不要画横跨脸部的线。box 要贴近真实部位，例如印堂只框两眉之间，山根只框鼻梁上方，耳朵只框耳朵，不要大范围乱框。name 必须用普通名称。";
   const prompt =
     `你是图像识别助手，任务是给传统文化测算软件做可视化标注，语言要让普通用户看懂。${kind === "palm" ? palmGuide : faceGuide}` +
     `必须只返回 JSON，不要解释。可选特征库：${names}。` +
@@ -123,8 +123,9 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
     features: features.slice(0, 18).map((feature, index) => {
       const known = matchCatalogItem(catalog, catalogMap, feature, index);
       const confidence = Number(feature.confidence ?? 0.5);
-      const points = normalizePoints(feature.points);
+      const points = kind === "face" ? [] : normalizePoints(feature.points);
       const needsLineReview = kind === "palm" && palmMainLineIds.has(known.id) && points.length < 4;
+      const faceLowConfidence = kind === "face" && confidence < 0.72;
       return {
         featureId: known.id,
         name: feature.name || known.name,
@@ -135,7 +136,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
         evidence: String(feature.evidence || ""),
         plainSummary: String(feature.plainSummary || ""),
         advice: String(feature.advice || ""),
-        needsReview: Boolean(feature.needsReview || confidence < 0.58 || needsLineReview),
+        needsReview: Boolean(feature.needsReview || confidence < 0.58 || needsLineReview || faceLowConfidence),
         interpretation: known.interpretation,
         sourceTitle: known.sourceTitle,
       };
