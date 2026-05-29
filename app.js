@@ -194,8 +194,6 @@ const reviewSummary = (result) => {
   };
 };
 
-const inputValue = (value) => escapeHtml(String(value || ""));
-
 const clearReview = (kind) => {
   const panel = $(`${kind}Review`);
   const list = $(`${kind}ReviewList`);
@@ -256,11 +254,14 @@ const renderReview = (kind) => {
             feature.editing
               ? `
                 <div class="review-editor">
-                  <label>名称<input data-edit-field="name" value="${inputValue(feature.name || guide.label)}" /></label>
-                  <label>AI看到<textarea data-edit-field="evidence">${inputValue(feature.evidence || "")}</textarea></label>
-                  <label>大白话解释<textarea data-edit-field="plainSummary">${inputValue(feature.plainSummary || guide.plain || "")}</textarea></label>
-                  <label>给用户的建议<textarea data-edit-field="advice">${inputValue(feature.advice || guide.advice || "")}</textarea></label>
-                  <button type="button" data-kind="${kind}" data-index="${index}" data-action="save">保存修改</button>
+                  <label>
+                    改成正确的线/部位
+                    <select data-edit-field="featureId">
+                      ${featureOptions(kind, feature.featureId)}
+                    </select>
+                  </label>
+                  <p>用户只纠正识别位置，说明和建议仍由 AI 自动生成。</p>
+                  <button type="button" data-kind="${kind}" data-index="${index}" data-action="save">保存纠正</button>
                 </div>
               `
               : ""
@@ -295,16 +296,57 @@ const updateReviewStatus = (kind, index, action) => {
   setMessage(`${kind}Status`, `已保留 ${summary.kept} 个，排除 ${summary.excluded} 个`);
 };
 
+const featureOptions = (kind, selectedId) => {
+  const palmOptions = [
+    ["life_line", "生命线"],
+    ["head_line", "智慧线"],
+    ["heart_line", "感情线"],
+    ["fate_line", "事业线"],
+    ["marriage_line", "婚姻线"],
+    ["palm_shape", "手型和掌色"],
+    ["five_fingers", "手指长短和指缝"],
+    ["moles_veins", "痣、青筋和颜色"],
+    ["special_shapes", "特殊纹路"],
+  ];
+  const faceOptions = [
+    ["forehead", "额头"],
+    ["yintang", "印堂"],
+    ["brows", "眉毛"],
+    ["eyes", "眼睛"],
+    ["nose_root", "山根"],
+    ["nose_tip", "鼻子"],
+    ["philtrum", "人中"],
+    ["mouth", "嘴唇"],
+    ["law_lines", "法令纹"],
+    ["ears", "耳朵"],
+    ["chin", "下巴"],
+    ["moles_scars_qi", "痣疤和气色"],
+  ];
+  const options = kind === "face" ? faceOptions : palmOptions;
+  return options
+    .map(([value, label]) => `<option value="${value}" ${value === selectedId ? "selected" : ""}>${label}</option>`)
+    .join("");
+};
+
+const applyFeatureCorrection = (kind, feature, featureId) => {
+  const guide = featureGuides[featureId];
+  if (!guide) return;
+  feature.featureId = featureId;
+  feature.name = guide.label;
+  feature.category = kind === "face" ? "用户纠正的面部位置" : "用户纠正的手掌位置";
+  feature.plainSummary = "";
+  feature.advice = "";
+  feature.evidence = `用户将此项纠正为：${guide.label}`;
+};
+
 const saveReviewEdit = (kind, index, button) => {
   const result = state[`${kind}Result`];
   const feature = result?.features?.[index];
   const editor = button.closest(".review-editor");
   if (!feature || !editor) return;
 
-  for (const field of ["name", "evidence", "plainSummary", "advice"]) {
-    const node = editor.querySelector(`[data-edit-field="${field}"]`);
-    if (node) feature[field] = node.value.trim();
-  }
+  const select = editor.querySelector('[data-edit-field="featureId"]');
+  applyFeatureCorrection(kind, feature, select?.value || feature.featureId);
 
   feature.included = true;
   feature.needsReview = false;
@@ -312,7 +354,7 @@ const saveReviewEdit = (kind, index, button) => {
   feature.editing = false;
   drawMarks(kind, result);
   renderReview(kind);
-  setMessage(`${kind}Status`, "已保存用户修改，并用于生成报告");
+  setMessage(`${kind}Status`, "已保存用户纠正，说明和建议将由 AI 自动生成");
 };
 
 const analyze = async (kind) => {
