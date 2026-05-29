@@ -194,6 +194,8 @@ const reviewSummary = (result) => {
   };
 };
 
+const inputValue = (value) => escapeHtml(String(value || ""));
+
 const clearReview = (kind) => {
   const panel = $(`${kind}Review`);
   const list = $(`${kind}ReviewList`);
@@ -240,15 +242,29 @@ const renderReview = (kind) => {
       const evidence = feature.evidence || "AI 只识别到大概位置";
       return `
         <article class="review-item ${feature.included === false ? "is-excluded" : ""}">
-          <div>
+          <div class="review-main">
             <strong>${escapeHtml(guide.label)}</strong>
             <span class="${statusClass}">${status} · AI把握 ${confidence}%</span>
             <p>${escapeHtml(evidence)}</p>
           </div>
           <div class="review-actions">
             <button type="button" data-kind="${kind}" data-index="${index}" data-action="confirm">确认</button>
+            <button type="button" data-kind="${kind}" data-index="${index}" data-action="edit">${feature.editing ? "收起" : "修改"}</button>
             <button type="button" data-kind="${kind}" data-index="${index}" data-action="${feature.included === false ? "restore" : "exclude"}">${feature.included === false ? "恢复" : "排除"}</button>
           </div>
+          ${
+            feature.editing
+              ? `
+                <div class="review-editor">
+                  <label>名称<input data-edit-field="name" value="${inputValue(feature.name || guide.label)}" /></label>
+                  <label>AI看到<textarea data-edit-field="evidence">${inputValue(feature.evidence || "")}</textarea></label>
+                  <label>大白话解释<textarea data-edit-field="plainSummary">${inputValue(feature.plainSummary || guide.plain || "")}</textarea></label>
+                  <label>给用户的建议<textarea data-edit-field="advice">${inputValue(feature.advice || guide.advice || "")}</textarea></label>
+                  <button type="button" data-kind="${kind}" data-index="${index}" data-action="save">保存修改</button>
+                </div>
+              `
+              : ""
+          }
         </article>
       `;
     })
@@ -269,12 +285,34 @@ const updateReviewStatus = (kind, index, action) => {
   } else if (action === "confirm") {
     feature.included = true;
     feature.reviewStatus = "confirmed";
+  } else if (action === "edit") {
+    feature.editing = !feature.editing;
   }
 
   drawMarks(kind, result);
   renderReview(kind);
   const summary = reviewSummary(result);
   setMessage(`${kind}Status`, `已保留 ${summary.kept} 个，排除 ${summary.excluded} 个`);
+};
+
+const saveReviewEdit = (kind, index, button) => {
+  const result = state[`${kind}Result`];
+  const feature = result?.features?.[index];
+  const editor = button.closest(".review-editor");
+  if (!feature || !editor) return;
+
+  for (const field of ["name", "evidence", "plainSummary", "advice"]) {
+    const node = editor.querySelector(`[data-edit-field="${field}"]`);
+    if (node) feature[field] = node.value.trim();
+  }
+
+  feature.included = true;
+  feature.needsReview = false;
+  feature.reviewStatus = "confirmed";
+  feature.editing = false;
+  drawMarks(kind, result);
+  renderReview(kind);
+  setMessage(`${kind}Status`, "已保存用户修改，并用于生成报告");
 };
 
 const analyze = async (kind) => {
@@ -326,7 +364,7 @@ const reviewedResult = (kind) => {
   if (!result) return null;
   return {
     ...result,
-    features: activeFeatures(result),
+    features: activeFeatures(result).map(({ editing, localId, ...feature }) => feature),
   };
 };
 
@@ -624,6 +662,10 @@ const clearAll = () => {
 const handleReviewClick = (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
+  if (button.dataset.action === "save") {
+    saveReviewEdit(button.dataset.kind, Number(button.dataset.index), button);
+    return;
+  }
   updateReviewStatus(button.dataset.kind, Number(button.dataset.index), button.dataset.action);
 };
 
