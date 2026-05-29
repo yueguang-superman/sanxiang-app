@@ -1,0 +1,21 @@
+name = "moonlight-lgl-reading"
+compatibility_date = "2026-05-29"
+pages_build_output_dir = "."
+
+[vars]
+DAILY_LIMIT = "3"
+AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+AI_MODEL = "qwen3.6-flash"
+
+# Required production secrets / variables in Cloudflare dashboard:
+# ACCESS_CODE     Shared access code for your small user group.
+# AI_API_KEY      Your Alibaba Cloud Model Studio / DashScope API key.
+#
+# Optional overrides:
+# AI_BASE_URL     Default: https://dashscope.aliyuncs.com/compatible-mode/v1
+# AI_MODEL        Default: qwen3.6-flash
+#
+# Recommended KV binding for real daily quota:
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "replace_with_cloudflare_kv_namespace_id"

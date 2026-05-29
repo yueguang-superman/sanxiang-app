@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>三相命理测算</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="seal">月</div>
+          <div>
+            <h1>三相命理测算</h1>
+            <p>月光LGL制作</p>
+          </div>
+        </div>
+
+        <section class="mystic-plate" aria-label="太极八卦盘">
+          <div class="bagua-ring">
+            <span class="tri qian">乾</span>
+            <span class="tri dui">兑</span>
+            <span class="tri li">离</span>
+            <span class="tri zhen">震</span>
+            <span class="tri xun">巽</span>
+            <span class="tri kan">坎</span>
+            <span class="tri gen">艮</span>
+            <span class="tri kun">坤</span>
+            <div class="taiji">
+              <span></span>
+            </div>
+          </div>
+          <p>太极生两仪，两仪辨阴阳；三相合参，以观形、察气、推时。</p>
+        </section>
+
+        <section class="access-panel" id="accessPanel">
+          <h2>入局口令</h2>
+          <p>输入共享访问码后开始测算。图片只用于本次云端识别，后端不保存原图。</p>
+          <div class="access-form">
+            <input id="accessCode" type="password" autocomplete="off" placeholder="输入共享访问码" />
+            <button id="unlockButton" type="button">进入</button>
+          </div>
+          <p class="mini" id="accessMessage"></p>
+        </section>
+
+        <nav class="nav">
+          <a href="#birth">生辰</a>
+          <a href="#images">图片识别</a>
+          <a href="#report">报告</a>
+        </nav>
+
+        <section class="note">
+          <h2>典籍据引</h2>
+          <p>框架取意于《周易》《麻衣神相》《神相全编》《三命通会》《滴天髓》《渊海子平》等术数传统。AI 只负责定位形迹，断语由规则库合参生成。</p>
+        </section>
+      </aside>
+
+      <section class="workspace locked" id="workspace">
+        <form class="input-panel" id="readingForm">
+          <section class="band" id="birth">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Bazi</p>
+                <h2>四柱排盘</h2>
+              </div>
+              <span class="status-pill" id="quotaStatus">未验证访问码</span>
+            </div>
+
+            <div class="grid two">
+              <label>
+                姓名或代称
+                <input id="personName" type="text" placeholder="例如：张先生" />
+              </label>
+              <label>
+                性别
+                <select id="gender">
+                  <option value="male">男</option>
+                  <option value="female">女</option>
+                </select>
+              </label>
+              <label>
+                出生日期
+                <input id="birthDate" type="date" required />
+              </label>
+              <label>
+                出生时间
+                <input id="birthTime" type="time" value="12:00" required />
+              </label>
+              <label>
+                时区
+                <select id="timezone">
+                  <option value="8">东八区，中国标准时间</option>
+                  <option value="9">东九区</option>
+                  <option value="0">零时区</option>
+                  <option value="-5">西五区</option>
+                  <option value="-8">西八区</option>
+                </select>
+              </label>
+              <label>
+                出生地备注
+                <input id="birthPlace" type="text" placeholder="城市或地区，可留空" />
+              </label>
+            </div>
+          </section>
+
+          <section class="band" id="images">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Vision</p>
+                <h2>观掌察面</h2>
+              </div>
+              <span class="status-pill">前端压缩后上传</span>
+            </div>
+
+            <div class="image-grid">
+              <article class="image-card">
+                <div class="image-card-head">
+                  <div>
+                    <h3>手掌图</h3>
+                    <p>观掌先取形色，再定三纹八宫。掌心清楚、光线均匀。</p>
+                  </div>
+                  <label class="upload-button">
+                    选择图片
+                    <input id="palmImage" type="file" accept="image/*" />
+                  </label>
+                </div>
+                <div class="mark-stage" id="palmStage">
+                  <img id="palmPreview" alt="手掌图预览" hidden />
+                  <svg id="palmMarks" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+                  <span class="empty-image" id="palmEmpty">未上传</span>
+                </div>
+                <div class="card-actions">
+                  <button id="analyzePalm" type="button">识别手相特殊点</button>
+                  <span id="palmStatus" class="mini"></span>
+                </div>
+              </article>
+
+              <article class="image-card">
+                <div class="image-card-head">
+                  <div>
+                    <h3>面部图</h3>
+                    <p>观面先分三停，再察五官气色。正脸无遮挡为佳。</p>
+                  </div>
+                  <label class="upload-button">
+                    选择图片
+                    <input id="faceImage" type="file" accept="image/*" />
+                  </label>
+                </div>
+                <div class="mark-stage" id="faceStage">
+                  <img id="facePreview" alt="面部图预览" hidden />
+                  <svg id="faceMarks" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+                  <span class="empty-image" id="faceEmpty">未上传</span>
+                </div>
+                <div class="card-actions">
+                  <button id="analyzeFace" type="button">识别面相特殊点</button>
+                  <span id="faceStatus" class="mini"></span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <div class="actions">
+            <button class="primary" type="submit">生成综合报告</button>
+            <button id="fillDemo" type="button">填入示例</button>
+            <button id="clearAll" type="button">清空</button>
+          </div>
+        </form>
+
+        <section class="report-panel" id="report">
+          <div class="report-empty">
+            <h2>静候开盘</h2>
+            <p>录入生辰，上传掌面之图。系统会标出特殊点，合四柱、掌纹、面相生成一份三相合参报告。</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
