@@ -146,6 +146,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, env }) => {
 
 const summarizeFeatures = (result) =>
   (result?.features || []).slice(0, 10).map((feature) => ({
+    featureId: feature.featureId,
     name: feature.name,
     category: feature.category,
     confidence: feature.confidence,
@@ -168,10 +169,11 @@ export const generatePlainReading = async ({ bazi, palm, face, env }) => {
     faceFeatures: summarizeFeatures(face),
   };
   const prompt =
-    "你是传统文化测算报告助手。请把输入内容总结成普通人听得懂的话，并给出实用建议。" +
-    "要求：不要吓人，不要绝对化，不要说医学/投资结论；少用术语，必要术语要解释成人话。" +
-    "输出必须是 JSON：{\"reading\":[\"一句结论或建议\",...]}。" +
-    "reading 输出 5 条，每条 35-70 个中文字符，语气像认真给朋友提醒。输入：" +
+    "你是传统文化测算报告助手。请按真人看图聊天的口吻写报告，格式参考：先说整体特点，再分 1.生命线 2.智慧线 3.感情线 4.事业线 5.明显特点，最后给现实建议和一句总结。" +
+    "要求：普通人能听懂；像认真给朋友分析；不要吓人，不要绝对化，不要编医学/投资结论；可以说“传统里一般会理解为”。" +
+    "如果输入没有某条线，就写“这张图里这条线不够清楚，先不强断”。现实建议要温和实用。" +
+    "输出必须是 JSON：{\"sections\":[{\"title\":\"整体特点\",\"paragraphs\":[\"...\"]}],\"reading\":[\"一句结论或建议\",...]}。" +
+    "sections 输出 7-8 段，每段 title 清楚，paragraphs 每段 2-5 句短句；reading 输出 4 条摘要。输入：" +
     JSON.stringify(input);
 
   const response = await fetch(endpoint, {
@@ -194,5 +196,8 @@ export const generatePlainReading = async ({ bazi, palm, face, env }) => {
   const payload = await response.json();
   const content = payload.choices?.[0]?.message?.content;
   const parsed = parseJson(content);
-  return Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : null;
+  return {
+    sections: Array.isArray(parsed.sections) ? parsed.sections.slice(0, 9) : [],
+    reading: Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : [],
+  };
 };

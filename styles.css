@@ -653,6 +653,26 @@ button.primary {
   border-top: 1px solid rgba(214, 169, 79, 0.14);
 }
 
+.narrative-report {
+  display: grid;
+  gap: 16px;
+}
+
+.narrative-section {
+  padding: 2px 0 10px;
+}
+
+.narrative-section h4 {
+  margin: 0 0 8px;
+  color: #fff2c9;
+  font-size: 18px;
+}
+
+.narrative-section p {
+  margin: 7px 0;
+  line-height: 1.85;
+}
+
 .pillar-row,
 .pill-row,
 .element-bars {

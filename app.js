@@ -604,6 +604,25 @@ const renderFeatureList = (title, result) => {
   return `<section class="report-section"><h3>${title}</h3><div class="feature-list">${items}</div></section>`;
 };
 
+const renderNarrativeSections = (sections = []) => {
+  if (!sections.length) return "";
+  return `
+    <section class="report-section narrative-report">
+      <h3>详细解读</h3>
+      ${sections
+        .map(
+          (section) => `
+            <article class="narrative-section">
+              <h4>${escapeHtml(section.title || "解读")}</h4>
+              ${(section.paragraphs || []).map((text) => `<p>${escapeHtml(text)}</p>`).join("")}
+            </article>
+          `,
+        )
+        .join("")}
+    </section>
+  `;
+};
+
 const renderReport = (report) => {
   const bazi = report.bazi;
   const elements = bazi.elements || {};
@@ -636,6 +655,8 @@ const renderReport = (report) => {
       <div class="element-bars">${elementBars}</div>
       <p class="source">${escapeHtml(bazi.summary)}</p>
     </section>
+
+    ${renderNarrativeSections(report.sections)}
 
     ${renderFeatureList("手掌识别结果", report.palm)}
     ${renderFeatureList("面部识别结果", report.face)}
