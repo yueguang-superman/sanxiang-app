@@ -6,7 +6,7 @@ pages_build_output_dir = "."
 DAILY_LIMIT = "20"
 AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 AI_MODEL = "qwen3.7-max"
-AI_VISION_MODEL = "qwen3.7-max"
+AI_VISION_MODEL = "qwen3-omni-flash"
 AI_REPORT_MODEL = "qwen3.7-max"
 
 # Required production secrets / variables in Cloudflare dashboard:
@@ -15,7 +15,7 @@ AI_REPORT_MODEL = "qwen3.7-max"
 #
 # Optional overrides:
 # AI_BASE_URL     Default: https://dashscope.aliyuncs.com/compatible-mode/v1
-# AI_VISION_MODEL Default: qwen3.7-max. Use a model that supports image input.
+# AI_VISION_MODEL Default: qwen3-omni-flash. Use a model that supports image input.
 # AI_REPORT_MODEL Default: qwen3.7-max. Used for plain-language report writing.
 #
 # Recommended KV binding for real daily quota:

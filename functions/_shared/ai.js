@@ -18,6 +18,20 @@ const parseJson = (text) => {
   }
 };
 
+const explainAiError = (status, text, model) => {
+  const raw = String(text || "");
+  if (status === 400 && /InvalidParameter|messages|image|video|vision/i.test(raw)) {
+    return `AI 看图失败：当前看图模型 ${model} 不接受这张图片。请确认 Cloudflare 里的 AI_VISION_MODEL 填的是支持图片/视频理解的模型，例如 qwen3-omni-flash。`;
+  }
+  if (status === 401 || status === 403) {
+    return "AI 看图失败：API Key 不对、没权限，或者百炼账号没有开通这个模型。";
+  }
+  if (status === 429) {
+    return "AI 看图失败：调用太频繁或额度用完了，稍后再试，或者检查百炼额度。";
+  }
+  return `AI 看图失败：接口返回 ${status}。请检查百炼 API Key、额度和模型名称。`;
+};
+
 const fallbackBox = (index) => ({
   x: 12 + (index % 3) * 24,
   y: 16 + Math.floor(index / 3) * 18,
@@ -86,7 +100,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
     `box、points、segments 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，不要画跨过无掌纹的直线，confidence 低于 0.55 且 needsReview=true。`;
 
   const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
-  const model = env.AI_VISION_MODEL || env.AI_MODEL || "qwen3.7-max";
+  const model = env.AI_VISION_MODEL || "qwen3-omni-flash";
   const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
   const requestBody = {
     model,
@@ -117,7 +131,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`AI 识别失败：${response.status}。当前模型 ${model} 可能不支持图片，或 API Key/额度异常。${text.slice(0, 90)}`);
+    throw new Error(explainAiError(response.status, text, model));
   }
 
   const payload = await response.json();
