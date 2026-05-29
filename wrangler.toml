@@ -5,7 +5,7 @@ pages_build_output_dir = "."
 [vars]
 DAILY_LIMIT = "20"
 AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-AI_MODEL = "qwen3.6-flash"
+AI_MODEL = "qwen3-vl-plus"
 
 # Required production secrets / variables in Cloudflare dashboard:
 # ACCESS_CODE     Shared access code for your small user group.
@@ -13,7 +13,7 @@ AI_MODEL = "qwen3.6-flash"
 #
 # Optional overrides:
 # AI_BASE_URL     Default: https://dashscope.aliyuncs.com/compatible-mode/v1
-# AI_MODEL        Default: qwen3.6-flash
+# AI_MODEL        Default: qwen3-vl-plus. Use a model that supports image input.
 #
 # Recommended KV binding for real daily quota:
 # [[kv_namespaces]]

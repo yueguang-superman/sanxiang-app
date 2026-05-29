@@ -32,7 +32,7 @@ body {
     linear-gradient(145deg, #070707, #16120d 46%, #060606);
   background-size: auto, 34px 34px, auto, auto, auto;
   font-family:
-    "STKaiti", "KaiTi", "Songti SC", "PingFang SC", "Microsoft YaHei", serif;
+    "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 button,
@@ -93,6 +93,7 @@ input[type="password"] {
   margin: 0;
   font-size: 25px;
   letter-spacing: 0;
+  font-family: "STKaiti", "KaiTi", "Songti SC", "PingFang SC", serif;
 }
 
 .brand p,
@@ -404,6 +405,15 @@ button.primary {
   fill: rgba(214, 169, 79, 0.09);
   stroke: #f3d58b;
   stroke-width: 0.45;
+}
+
+.mark-line {
+  fill: none;
+  stroke: #ffe28a;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
 }
 
 .mark-label {

@@ -41,13 +41,13 @@ const unlock = async () => {
     return;
   }
 
-  setMessage("accessMessage", "正在校验口令...");
+  setMessage("accessMessage", "正在检查访问码...");
   try {
     const result = await api("/api/access", {});
     sessionStorage.setItem("accessCode", state.accessCode);
     $("workspace").classList.remove("locked");
     $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
-    setMessage("accessMessage", "已入局。");
+    setMessage("accessMessage", "已进入，可以开始测算。");
   } catch (error) {
     $("workspace").classList.add("locked");
     setMessage("accessMessage", error.message, true);
@@ -101,17 +101,24 @@ const escapeHtml = (text = "") =>
     .replaceAll('"', "&quot;");
 
 const normalizeBox = (box = {}) => {
-  const x = Number(box.x ?? box.left ?? 0);
-  const y = Number(box.y ?? box.top ?? 0);
-  const width = Number(box.width ?? box.w ?? 12);
-  const height = Number(box.height ?? box.h ?? 8);
+  const rawX = Number.isFinite(Number(box.x ?? box.left)) ? Number(box.x ?? box.left) : 0;
+  const rawY = Number.isFinite(Number(box.y ?? box.top)) ? Number(box.y ?? box.top) : 0;
+  const x = Math.max(0, Math.min(96, rawX));
+  const y = Math.max(0, Math.min(96, rawY));
+  const width = Number.isFinite(Number(box.width ?? box.w)) ? Number(box.width ?? box.w) : 12;
+  const height = Number.isFinite(Number(box.height ?? box.h)) ? Number(box.height ?? box.h) : 8;
   return {
-    x: Math.max(0, Math.min(96, x)),
-    y: Math.max(0, Math.min(96, y)),
+    x,
+    y,
     width: Math.max(3, Math.min(100 - x, width)),
     height: Math.max(3, Math.min(100 - y, height)),
   };
 };
+
+const normalizePoint = (point = {}) => ({
+  x: Math.max(0, Math.min(100, Number(point.x ?? 0))),
+  y: Math.max(0, Math.min(100, Number(point.y ?? 0))),
+});
 
 const drawMarks = (kind, result) => {
   const svg = $(`${kind}Marks`);
@@ -120,22 +127,31 @@ const drawMarks = (kind, result) => {
   for (const feature of features) {
     const box = normalizeBox(feature.box);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const points = (feature.points || []).map(normalizePoint).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("class", "mark-box");
-    rect.setAttribute("x", box.x);
-    rect.setAttribute("y", box.y);
-    rect.setAttribute("width", box.width);
-    rect.setAttribute("height", box.height);
-    rect.setAttribute("rx", 1.4);
+    if (points.length >= 2) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      line.setAttribute("class", "mark-line");
+      line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
+      group.append(line);
+    } else {
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("class", "mark-box");
+      rect.setAttribute("x", box.x);
+      rect.setAttribute("y", box.y);
+      rect.setAttribute("width", box.width);
+      rect.setAttribute("height", box.height);
+      rect.setAttribute("rx", 1.4);
+      group.append(rect);
+    }
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("class", "mark-label");
-    label.setAttribute("x", Math.min(94, box.x + 1));
-    label.setAttribute("y", Math.max(5, box.y - 1));
+    label.setAttribute("x", Math.min(94, points[0]?.x ?? box.x + 1));
+    label.setAttribute("y", Math.max(5, (points[0]?.y ?? box.y) - 1));
     label.textContent = feature.name || feature.featureId || "特殊点";
 
-    group.append(rect, label);
+    group.append(label);
     svg.append(group);
   }
 };
@@ -147,8 +163,8 @@ const analyze = async (kind) => {
     return null;
   }
 
-  const label = kind === "palm" ? "手相" : "面相";
-  setMessage(`${kind}Status`, `正在识别${label}特殊点...`);
+  const label = kind === "palm" ? "手掌照片" : "面部照片";
+  setMessage(`${kind}Status`, `AI 正在分析${label}...`);
   try {
     const result = await api(`/api/analyze/${kind}`, {
       imageDataUrl: image.dataUrl,
@@ -157,7 +173,8 @@ const analyze = async (kind) => {
     state[`${kind}Result`] = result;
     drawMarks(kind, result);
     const count = result.features?.length || 0;
-    setMessage(`${kind}Status`, `已标记 ${count} 个特殊点`);
+    const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
+    setMessage(`${kind}Status`, count ? `已标出 ${count} 个位置` : emptyTip, !count);
     if (typeof result.remaining === "number") {
       $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
     }
@@ -180,13 +197,13 @@ const birthPayload = () => ({
 const renderFeatureList = (title, result) => {
   const features = result?.features || [];
   if (!features.length) {
-    return `<section class="report-section"><h3>${title}</h3><p class="source">暂无可靠标记。若未配置视觉 AI，可先完成八字报告。</p></section>`;
+    return `<section class="report-section"><h3>${title}</h3><p class="source">这张图暂时没有识别到清楚位置。建议重新上传更清晰的照片：画面里只放手掌或正脸，光线亮一点，不要遮挡。</p></section>`;
   }
   const items = features
     .map((feature) => {
       const confidence = Math.round((feature.confidence ?? 0) * 100);
       const review = feature.needsReview ? "，待复核" : "";
-      return `<li><strong>${escapeHtml(feature.name)}</strong>：${escapeHtml(feature.interpretation || feature.evidence || "已识别为特殊点")} <span class="mini">置信度 ${confidence}%${review}</span></li>`;
+      return `<li><strong>${escapeHtml(feature.name)}</strong>：${escapeHtml(feature.evidence || feature.interpretation || "已识别到这个位置")} <span class="mini">可信度 ${confidence}%${review}</span></li>`;
     })
     .join("");
   return `<section class="report-section"><h3>${title}</h3><ul>${items}</ul></section>`;
@@ -206,8 +223,8 @@ const renderReport = (report) => {
   $("report").innerHTML = `
     <div class="report-title">
       <div>
-        <h2>${escapeHtml(report.subject)}三相合参</h2>
-        <p>月光LGL制作。此报告为术数文化参考，不作医学、法律、投资或现实承诺。</p>
+        <h2>${escapeHtml(report.subject)}综合测算报告</h2>
+        <p>月光LGL制作。内容只作传统文化娱乐参考，不等于现实承诺。</p>
       </div>
       <div class="score"><span>综合气势</span><strong>${report.score}</strong></div>
     </div>
@@ -220,22 +237,22 @@ const renderReport = (report) => {
     </section>
 
     <section class="report-section">
-      <h3>五行气脉</h3>
+      <h3>五行统计</h3>
       <div class="element-bars">${elementBars}</div>
       <p class="source">${escapeHtml(bazi.summary)}</p>
     </section>
 
-    ${renderFeatureList("手相特殊点", report.palm)}
-    ${renderFeatureList("面相特殊点", report.face)}
+    ${renderFeatureList("手掌识别结果", report.palm)}
+    ${renderFeatureList("面部识别结果", report.face)}
 
     <section class="report-section">
-      <h3>合参断语</h3>
+      <h3>综合解读</h3>
       <ul>${report.reading.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
     </section>
 
     <section class="report-section">
-      <h3>典籍取意</h3>
-      <p class="source">取《周易》观象取类之法，合《麻衣神相》《神相全编》形气部位，《三命通会》《滴天髓》《渊海子平》四柱五行之理。今以 AI 定位形迹，以规则库收束断语。</p>
+      <h3>参考来源</h3>
+      <p class="source">参考《周易》的取象方法，也借用了《麻衣神相》《神相全编》里的手相、面相部位说法，以及《三命通会》《滴天髓》《渊海子平》里的四柱五行思路。AI 负责看图标位置，解释由规则库生成。</p>
     </section>
   `;
 };
@@ -247,7 +264,7 @@ const submitReport = async (event) => {
     return;
   }
 
-  $("report").innerHTML = `<div class="report-empty"><h2>正在开盘</h2><p>正在合参四柱、掌纹、面相特殊点...</p></div>`;
+  $("report").innerHTML = `<div class="report-empty"><h2>正在生成报告</h2><p>正在分析生日、手掌照片和面部照片...</p></div>`;
 
   if (state.palmImage && !state.palmResult) await analyze("palm");
   if (state.faceImage && !state.faceResult) await analyze("face");

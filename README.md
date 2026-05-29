@@ -6,8 +6,8 @@
 
 - 共享访问码进入，不做账号系统。
 - 上传手掌图、面部图，前端压缩后传到 Cloudflare Pages Functions。
-- 后端调用 OpenAI-compatible 视觉 AI，返回手相/面相特殊点坐标、置信度和解释。
-- 后端排四柱八字，生成五行、十神和三相合参报告。
+- 后端调用 OpenAI-compatible 全模态/视觉 AI，优先返回生命线、智慧线、感情线、事业线、婚姻线等普通用户看得懂的位置。
+- 后端排四柱八字，生成五行、十神和通俗综合报告。
 - 图片只在本次请求中使用，不落长期存储。
 
 ## 部署
@@ -20,7 +20,7 @@
    - `DAILY_LIMIT`：每日次数，比如 `20`。
    - `AI_API_KEY`：通义千问 / 阿里云百炼 API Key。
    - `AI_BASE_URL`：默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`，可不改。
-   - `AI_MODEL`：默认 `qwen3.6-flash`，低成本优先；需要更强效果时再换更高阶视觉模型。
+   - `AI_MODEL`：默认 `qwen3-vl-plus`，用于图片识别。必须选择支持图片输入的模型。
 5. 建议创建 Cloudflare KV，并绑定为 `RATE_LIMIT_KV`，用于稳定记录每日限次。
 
 ## 通义千问配置
@@ -28,10 +28,18 @@
 本项目默认走阿里云百炼 DashScope 的 OpenAI 兼容接口：
 
 - `AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`
-- `AI_MODEL=qwen3.6-flash`
+- `AI_MODEL=qwen3-vl-plus`
 - `AI_API_KEY=你的百炼 API Key`
 
 不要把 `AI_API_KEY` 写进前端代码或 GitHub 仓库。请只放在 Cloudflare Pages 的环境变量或 Secret 里。
+
+如果百炼后台确认你的账号可以调用更高阶的全模态模型，可以把 `AI_MODEL` 改成对应模型名。注意：纯文字模型不能识别手掌图片；比如只擅长文字的 Max 模型不适合做手掌标注。如果想省钱，可以改成 `qwen3-vl-flash`。
+
+## 拍照建议
+
+- 手掌图：掌心朝上，手掌尽量占满画面，光线亮一点，别太斜，别只拍手指。
+- 面部图：正脸无遮挡，别戴墨镜，脸部不要太暗。
+- 如果系统提示“没有识别到清楚位置”，通常不是报告坏了，而是照片里的纹路线条不够清楚，换一张近一点、亮一点的图即可。
 
 ## 低成本建议
 

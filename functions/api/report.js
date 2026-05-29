@@ -12,14 +12,14 @@ const scoreFrom = (bazi, palm, face) => {
 const featureNames = (result) => (result?.features || []).slice(0, 6).map((item) => item.name).join("、");
 
 const buildReading = (bazi, palm, face) => {
-  const palmNames = featureNames(palm) || "掌纹未成局";
-  const faceNames = featureNames(face) || "面相未成局";
+  const palmNames = featureNames(palm) || "没有识别到清楚掌纹";
+  const faceNames = featureNames(face) || "没有识别到清楚面部特征";
   return [
-    `四柱显示：${bazi.summary}`,
-    `手相取象：本次见 ${palmNames}。掌中之纹重在清浊、深浅、断续，宜与八宫落点同参。`,
-    `面相取象：本次见 ${faceNames}。面部以三停为纲、五官为用，痣疤纹气色为应事之端。`,
-    `合参建议：先看五行偏枯，再看掌面特殊点是否互相呼应；若同一主题在八字、掌纹、面相重复出现，才可作为重点提示。`,
-    `谨记：此为传统文化娱乐与自我观察参考，不替代医学、法律、投资或人生重大决策。`,
+    `生日信息显示：${bazi.summary}`,
+    `手掌照片里，本次主要看到：${palmNames}。重点先看生命线、智慧线、感情线、事业线、婚姻线这些大家能看懂的线，再看细纹和掌色。`,
+    `面部照片里，本次主要看到：${faceNames}。重点看印堂、眉眼、鼻子、人中、嘴唇、耳朵、下巴，以及痣疤和明显气色。`,
+    `综合看法：同一个提醒如果在生日信息、手掌、面部里反复出现，才算重点；只出现一次的内容，当作娱乐参考即可。`,
+    `提醒：这是传统文化娱乐和自我观察工具，不能替代医学、法律、投资或人生重大决定。`,
   ];
 };
 

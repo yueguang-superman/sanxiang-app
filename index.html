@@ -31,11 +31,11 @@
               <span></span>
             </div>
           </div>
-          <p>太极生两仪，两仪辨阴阳；三相合参，以观形、察气、推时。</p>
+          <p>上传手掌和正脸照片，再填出生时间。系统会先标位置，再生成通俗报告。</p>
         </section>
 
         <section class="access-panel" id="accessPanel">
-          <h2>入局口令</h2>
+          <h2>访问码</h2>
           <p>输入共享访问码后开始测算。图片只用于本次云端识别，后端不保存原图。</p>
           <div class="access-form">
             <input id="accessCode" type="password" autocomplete="off" placeholder="输入共享访问码" />
@@ -51,8 +51,8 @@
         </nav>
 
         <section class="note">
-          <h2>典籍据引</h2>
-          <p>框架取意于《周易》《麻衣神相》《神相全编》《三命通会》《滴天髓》《渊海子平》等术数传统。AI 只负责定位形迹，断语由规则库合参生成。</p>
+          <h2>怎么理解</h2>
+          <p>这是传统文化娱乐工具。AI 负责看图，把生命线、事业线、婚姻线、印堂、鼻相等位置标出来；后面的解释参考《周易》《麻衣神相》《神相全编》《三命通会》等资料，用大白话写出来。</p>
         </section>
       </aside>
 
@@ -61,8 +61,8 @@
           <section class="band" id="birth">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Bazi</p>
-                <h2>四柱排盘</h2>
+                <p class="eyebrow">Birth</p>
+                <h2>出生信息</h2>
               </div>
               <span class="status-pill" id="quotaStatus">未验证访问码</span>
             </div>
@@ -107,10 +107,10 @@
           <section class="band" id="images">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Vision</p>
-                <h2>观掌察面</h2>
+                <p class="eyebrow">AI Vision</p>
+                <h2>AI 看图标位置</h2>
               </div>
-              <span class="status-pill">前端压缩后上传</span>
+              <span class="status-pill">图片不会长期保存</span>
             </div>
 
             <div class="image-grid">
@@ -118,7 +118,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>手掌图</h3>
-                    <p>观掌先取形色，再定三纹八宫。掌心清楚、光线均匀。</p>
+                    <p>请拍清楚掌心，手掌尽量占满画面。重点会标生命线、智慧线、感情线、事业线、婚姻线。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -131,7 +131,7 @@
                   <span class="empty-image" id="palmEmpty">未上传</span>
                 </div>
                 <div class="card-actions">
-                  <button id="analyzePalm" type="button">识别手相特殊点</button>
+                  <button id="analyzePalm" type="button">分析手掌照片</button>
                   <span id="palmStatus" class="mini"></span>
                 </div>
               </article>
@@ -140,7 +140,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>面部图</h3>
-                    <p>观面先分三停，再察五官气色。正脸无遮挡为佳。</p>
+                    <p>请上传清楚正脸。重点会标印堂、眉眼、鼻子、人中、嘴唇、耳朵、下巴、痣疤气色。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -153,7 +153,7 @@
                   <span class="empty-image" id="faceEmpty">未上传</span>
                 </div>
                 <div class="card-actions">
-                  <button id="analyzeFace" type="button">识别面相特殊点</button>
+                  <button id="analyzeFace" type="button">分析面部照片</button>
                   <span id="faceStatus" class="mini"></span>
                 </div>
               </article>
@@ -169,8 +169,8 @@
 
         <section class="report-panel" id="report">
           <div class="report-empty">
-            <h2>静候开盘</h2>
-            <p>录入生辰，上传掌面之图。系统会标出特殊点，合四柱、掌纹、面相生成一份三相合参报告。</p>
+            <h2>还没有生成报告</h2>
+            <p>先填写出生信息，再上传手掌和面部照片。系统会把看见的位置标出来，并生成一份容易看懂的综合报告。</p>
           </div>
         </section>
       </section>
