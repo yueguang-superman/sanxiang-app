@@ -21,7 +21,7 @@ const parseJson = (text) => {
 const explainAiError = (status, text, model) => {
   const raw = String(text || "");
   if (status === 400 && /InvalidParameter|messages|image|video|vision/i.test(raw)) {
-    return `AI 看图失败：当前看图模型 ${model} 不接受这张图片。请确认 Cloudflare 里的 AI_VISION_MODEL 填的是支持图片/视频理解的模型，例如 qwen3-omni-flash。`;
+    return `AI 看图失败：当前看图模型 ${model} 不接受这张图片。请确认 Cloudflare 里的 AI_VISION_MODEL 填的是支持图片/视频理解的模型，例如 qwen3.6-plus。`;
   }
   if (status === 401 || status === 403) {
     return "AI 看图失败：API Key 不对、没权限，或者百炼账号没有开通这个模型。";
@@ -100,7 +100,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
     `box、points、segments 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，不要画跨过无掌纹的直线，confidence 低于 0.55 且 needsReview=true。`;
 
   const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
-  const model = env.AI_VISION_MODEL || "qwen3-omni-flash";
+  const model = env.AI_VISION_MODEL || "qwen3.6-plus";
   const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
   const requestBody = {
     model,

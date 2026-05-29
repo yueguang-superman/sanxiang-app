@@ -20,7 +20,7 @@
    - `DAILY_LIMIT`：每日次数，比如 `20`。
    - `AI_API_KEY`：通义千问 / 阿里云百炼 API Key。
    - `AI_BASE_URL`：默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`，可不改。
-   - `AI_VISION_MODEL`：默认 `qwen3-omni-flash`，用于图片识别。必须选择支持图片输入的模型。
+   - `AI_VISION_MODEL`：默认 `qwen3.6-plus`，用于图片识别。必须选择支持图片输入的模型。
    - `AI_REPORT_MODEL`：默认 `qwen3.7-max`，用于把报告写成大白话总结和建议。
 5. 建议创建 Cloudflare KV，并绑定为 `RATE_LIMIT_KV`，用于稳定记录每日限次。
 
@@ -29,7 +29,7 @@
 本项目默认走阿里云百炼 DashScope 的 OpenAI 兼容接口：
 
 - `AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`
-- `AI_VISION_MODEL=qwen3-omni-flash`
+- `AI_VISION_MODEL=qwen3.6-plus`
 - `AI_REPORT_MODEL=qwen3.7-max`
 - `AI_API_KEY=你的百炼 API Key`
 
