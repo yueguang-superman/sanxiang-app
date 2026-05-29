@@ -84,6 +84,7 @@ const loadImage = async (kind, file) => {
   const image = await compressImage(file);
   state[`${kind}Image`] = image;
   state[`${kind}Result`] = null;
+  clearReview(kind);
 
   const preview = $(`${kind}Preview`);
   $(`${kind}Stage`).style.aspectRatio = `${image.width} / ${image.height}`;
@@ -142,10 +143,12 @@ const canDrawTrace = (kind, feature, points) => {
   return points.length >= 4 && score.length >= 14 && score.maxSegment <= 32 && (feature.confidence ?? 0) >= 0.68 && !feature.needsReview;
 };
 
+const activeFeatures = (result) => (result?.features || []).filter((feature) => feature.included !== false);
+
 const drawMarks = (kind, result) => {
   const svg = $(`${kind}Marks`);
   svg.innerHTML = "";
-  const features = result?.features || [];
+  const features = activeFeatures(result);
   for (const feature of features) {
     const box = normalizeBox(feature.box);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -179,6 +182,98 @@ const drawMarks = (kind, result) => {
   }
 };
 
+const reviewSummary = (result) => {
+  const features = result?.features || [];
+  return {
+    kept: features.filter((feature) => feature.included !== false).length,
+    excluded: features.filter((feature) => feature.included === false).length,
+    confirmed: features.filter((feature) => feature.reviewStatus === "confirmed").length,
+  };
+};
+
+const clearReview = (kind) => {
+  const panel = $(`${kind}Review`);
+  const list = $(`${kind}ReviewList`);
+  if (panel) panel.hidden = true;
+  if (list) list.innerHTML = "";
+};
+
+const prepareReview = (kind, result) => ({
+  ...result,
+  features: (result.features || []).map((feature, index) => ({
+    ...feature,
+    localId: `${kind}-${Date.now()}-${index}`,
+    included: feature.included !== false,
+    reviewStatus: feature.needsReview ? "pending" : "kept",
+  })),
+});
+
+const renderReview = (kind) => {
+  const result = state[`${kind}Result`];
+  const panel = $(`${kind}Review`);
+  const list = $(`${kind}ReviewList`);
+  if (!panel || !list) return;
+
+  const features = result?.features || [];
+  panel.hidden = !features.length;
+  if (!features.length) {
+    list.innerHTML = "";
+    return;
+  }
+
+  list.innerHTML = features
+    .map((feature, index) => {
+      const guide = guideForFeature(feature);
+      const confidence = Math.round((feature.confidence ?? 0) * 100);
+      const status =
+        feature.included === false
+          ? "已排除"
+          : feature.reviewStatus === "confirmed"
+            ? "已确认"
+            : feature.needsReview
+              ? "待复核"
+              : "已保留";
+      const statusClass = feature.included === false ? "excluded" : feature.reviewStatus === "confirmed" ? "confirmed" : "pending";
+      const evidence = feature.evidence || "AI 只识别到大概位置";
+      return `
+        <article class="review-item ${feature.included === false ? "is-excluded" : ""}">
+          <div>
+            <strong>${escapeHtml(guide.label)}</strong>
+            <span class="${statusClass}">${status} · AI把握 ${confidence}%</span>
+            <p>${escapeHtml(evidence)}</p>
+          </div>
+          <div class="review-actions">
+            <button type="button" data-kind="${kind}" data-index="${index}" data-action="confirm">确认</button>
+            <button type="button" data-kind="${kind}" data-index="${index}" data-action="${feature.included === false ? "restore" : "exclude"}">${feature.included === false ? "恢复" : "排除"}</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+};
+
+const updateReviewStatus = (kind, index, action) => {
+  const result = state[`${kind}Result`];
+  const feature = result?.features?.[index];
+  if (!feature) return;
+
+  if (action === "exclude") {
+    feature.included = false;
+    feature.reviewStatus = "excluded";
+  } else if (action === "restore") {
+    feature.included = true;
+    feature.reviewStatus = feature.needsReview ? "pending" : "kept";
+  } else if (action === "confirm") {
+    feature.included = true;
+    feature.reviewStatus = "confirmed";
+  }
+
+  drawMarks(kind, result);
+  renderReview(kind);
+  const summary = reviewSummary(result);
+  setMessage(`${kind}Status`, `已保留 ${summary.kept} 个，排除 ${summary.excluded} 个`);
+};
+
 const analyze = async (kind) => {
   const image = state[`${kind}Image`];
   if (!image) {
@@ -193,11 +288,12 @@ const analyze = async (kind) => {
       imageDataUrl: image.dataUrl,
       imageMeta: { width: image.width, height: image.height },
     });
-    state[`${kind}Result`] = result;
-    drawMarks(kind, result);
-    const count = result.features?.length || 0;
+    state[`${kind}Result`] = prepareReview(kind, result);
+    drawMarks(kind, state[`${kind}Result`]);
+    renderReview(kind);
+    const count = state[`${kind}Result`].features?.length || 0;
     const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
-    const reviewCount = result.features?.filter((feature) => feature.needsReview).length || 0;
+    const reviewCount = state[`${kind}Result`].features?.filter((feature) => feature.needsReview).length || 0;
     const doneText =
       kind === "palm" && reviewCount
         ? `已标出 ${count} 个候选位置，掌纹太淡的线已改为候选区`
@@ -221,6 +317,15 @@ const birthPayload = () => ({
   timezone: Number($("timezone").value),
   birthPlace: $("birthPlace").value.trim(),
 });
+
+const reviewedResult = (kind) => {
+  const result = state[`${kind}Result`];
+  if (!result) return null;
+  return {
+    ...result,
+    features: activeFeatures(result),
+  };
+};
 
 const featureGuides = {
   life_line: {
@@ -479,8 +584,8 @@ const submitReport = async (event) => {
   try {
     const report = await api("/api/report", {
       birth: birthPayload(),
-      palm: state.palmResult,
-      face: state.faceResult,
+      palm: reviewedResult("palm"),
+      face: reviewedResult("face"),
     });
     renderReport(report);
   } catch (error) {
@@ -508,8 +613,15 @@ const clearAll = () => {
     $(`${kind}Stage`).style.removeProperty("aspect-ratio");
     $(`${kind}Empty`).hidden = false;
     $(`${kind}Marks`).innerHTML = "";
+    clearReview(kind);
     setMessage(`${kind}Status`, "");
   }
+};
+
+const handleReviewClick = (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  updateReviewStatus(button.dataset.kind, Number(button.dataset.index), button.dataset.action);
 };
 
 $("unlockButton").addEventListener("click", unlock);
@@ -520,6 +632,8 @@ $("palmImage").addEventListener("change", (event) => loadImage("palm", event.tar
 $("faceImage").addEventListener("change", (event) => loadImage("face", event.target.files[0]));
 $("analyzePalm").addEventListener("click", () => analyze("palm"));
 $("analyzeFace").addEventListener("click", () => analyze("face"));
+$("palmReview").addEventListener("click", handleReviewClick);
+$("faceReview").addEventListener("click", handleReviewClick);
 $("readingForm").addEventListener("submit", submitReport);
 $("fillDemo").addEventListener("click", fillDemo);
 $("clearAll").addEventListener("click", clearAll);

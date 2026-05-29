@@ -134,6 +134,13 @@
                   <button id="analyzePalm" type="button">分析手掌照片</button>
                   <span id="palmStatus" class="mini"></span>
                 </div>
+                <div class="review-panel" id="palmReview" hidden>
+                  <div class="review-head">
+                    <strong>审核识别结果</strong>
+                    <span>不准的点可以排除，报告不会使用</span>
+                  </div>
+                  <div class="review-list" id="palmReviewList"></div>
+                </div>
               </article>
 
               <article class="image-card">
@@ -155,6 +162,13 @@
                 <div class="card-actions">
                   <button id="analyzeFace" type="button">分析面部照片</button>
                   <span id="faceStatus" class="mini"></span>
+                </div>
+                <div class="review-panel" id="faceReview" hidden>
+                  <div class="review-head">
+                    <strong>审核识别结果</strong>
+                    <span>不准的点可以排除，报告不会使用</span>
+                  </div>
+                  <div class="review-list" id="faceReviewList"></div>
                 </div>
               </article>
             </div>
