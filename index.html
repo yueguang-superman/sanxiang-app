@@ -13,7 +13,7 @@
           <div class="seal">月</div>
           <div>
             <h1>三相命理测算</h1>
-            <p>月光LGL制作</p>
+            <p>月光LGL制作 · 掌面八字合参</p>
           </div>
         </div>
 
@@ -37,7 +37,7 @@
               </svg>
             </div>
           </div>
-          <p>上传手掌和正脸照片，再填出生时间。系统不再乱画线，只判断照片能不能看清，然后直接给出大白话分析。</p>
+          <p>先定生辰，再观掌面。照片只作本次测算，不留原图。</p>
         </section>
 
         <section class="access-panel" id="accessPanel">
@@ -51,23 +51,28 @@
         </section>
 
         <nav class="nav">
-          <a href="#birth">生辰</a>
-          <a href="#images">图片识别</a>
-          <a href="#report">报告</a>
+          <a href="#birth">出生信息</a>
+          <a href="#images">掌面照片</a>
+          <a href="#report">综合报告</a>
         </nav>
 
         <section class="note">
-          <h2>怎么理解</h2>
+          <h2>测算说明</h2>
           <p>这是传统文化娱乐工具。照片不清楚就让用户重拍；照片清楚就直接看手相、面相和八字，写成人能听懂的话。</p>
         </section>
       </aside>
 
       <section class="workspace locked" id="workspace">
         <form class="input-panel" id="readingForm">
+          <header class="form-title">
+            <p>三相合参</p>
+            <h2>录入资料</h2>
+          </header>
+
           <section class="band" id="birth">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Birth</p>
+                <p class="eyebrow">第一步</p>
                 <h2>出生信息</h2>
               </div>
               <span class="status-pill" id="quotaStatus">未验证访问码</span>
@@ -113,8 +118,8 @@
           <section class="band" id="images">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Photo Reading</p>
-                <h2>照片直接分析</h2>
+                <p class="eyebrow">第二步</p>
+                <h2>掌面照片</h2>
               </div>
               <span class="status-pill">不画线，只出分析</span>
             </div>
@@ -186,7 +191,7 @@
 
           <div class="actions">
             <button class="primary" type="submit">生成综合报告</button>
-            <button id="fillDemo" type="button">填入示例</button>
+            <button id="fillDemo" type="button">示例</button>
             <button id="clearAll" type="button">清空</button>
           </div>
         </form>

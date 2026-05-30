@@ -9,6 +9,7 @@ const state = {
   faceImage: null,
   palmResult: null,
   faceResult: null,
+  scanLocks: { palm: 0, face: 0 },
 };
 
 localStorage.setItem("anonymousId", state.anonymousId);
@@ -55,6 +56,19 @@ const setMessage = (id, text, isError = false) => {
   const node = $(id);
   node.textContent = text;
   node.classList.toggle("error", isError);
+};
+
+const setPhotoMotion = (kind, active) => {
+  const stage = $(`${kind}Stage`);
+  if (!stage) return;
+  state.scanLocks[kind] = Math.max(0, (state.scanLocks[kind] || 0) + (active ? 1 : -1));
+  stage.classList.toggle("is-reading", state.scanLocks[kind] > 0);
+};
+
+const setUploadedPhotosMotion = (active) => {
+  for (const kind of ["palm", "face"]) {
+    if (state[`${kind}Image`]) setPhotoMotion(kind, active);
+  }
 };
 
 const unlock = async () => {
@@ -295,6 +309,7 @@ const analyze = async (kind, userCorrection = "") => {
 
   const label = kind === "palm" ? "手掌照片" : "面部照片";
   setMessage(`${kind}Status`, userCorrection ? `正在按你的反馈重新看${label}...` : `正在看${label}...`);
+  setPhotoMotion(kind, true);
   try {
     const result = await api(`/api/analyze/${kind}`, {
       imageDataUrl: image.dataUrl,
@@ -325,6 +340,8 @@ const analyze = async (kind, userCorrection = "") => {
   } catch (error) {
     setMessage(`${kind}Status`, error.message, true);
     return null;
+  } finally {
+    setPhotoMotion(kind, false);
   }
 };
 
@@ -618,11 +635,12 @@ const submitReport = async (event) => {
   }
 
   $("report").innerHTML = `<div class="report-empty"><h2>正在生成报告</h2><p>正在分析生日、手掌照片和面部照片...</p></div>`;
-
-  if (state.palmImage && !state.palmResult) await analyze("palm");
-  if (state.faceImage && !state.faceResult) await analyze("face");
+  setUploadedPhotosMotion(true);
 
   try {
+    if (state.palmImage && !state.palmResult) await analyze("palm");
+    if (state.faceImage && !state.faceResult) await analyze("face");
+
     const report = await api("/api/report", {
       birth: birthPayload(),
       palm: reviewedResult("palm"),
@@ -631,6 +649,8 @@ const submitReport = async (event) => {
     renderReport(report);
   } catch (error) {
     $("report").innerHTML = `<div class="report-empty"><h2>生成失败</h2><p class="error">${escapeHtml(error.message)}</p></div>`;
+  } finally {
+    setUploadedPhotosMotion(false);
   }
 };
 
