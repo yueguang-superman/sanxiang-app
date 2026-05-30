@@ -7,14 +7,34 @@ const stripFence = (text) =>
     .replace(/```$/i, "")
     .trim();
 
+const contentText = (content) => {
+  if (Array.isArray(content)) {
+    return content.map((part) => (typeof part === "string" ? part : part?.text || "")).join("\n");
+  }
+  return String(content || "");
+};
+
 const parseJson = (text) => {
-  const cleaned = stripFence(text);
+  const cleaned = stripFence(contentText(text));
   try {
     return JSON.parse(cleaned);
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("AI 返回不是 JSON。");
     return JSON.parse(match[0]);
+  }
+};
+
+const parseAnalysis = (content) => {
+  try {
+    return parseJson(content);
+  } catch {
+    return {
+      usable: true,
+      imageQuality: "unknown",
+      reportText: contentText(content).trim(),
+      features: [],
+    };
   }
 };
 
@@ -48,6 +68,60 @@ const fetchWithTimeout = async (url, options, timeoutMs, timeoutMessage) => {
   } finally {
     clearTimeout(timer);
   }
+};
+
+const timeoutMs = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 5000 ? parsed : fallback;
+};
+
+const aiEndpoint = (env) => (env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1").replace(/\/$/, "") + "/chat/completions";
+
+const aiJsonMode = (env) => env.AI_JSON_MODE === "on";
+
+const callAiChat = async ({ env, model, messages, maxTokens = 300, temperature = 0, timeout = 30000, responseFormat = true, timeoutMessage }) => {
+  if (!env.AI_API_KEY) {
+    throw new Error("尚未配置通义千问 API Key。请在 Cloudflare 环境变量中设置 AI_API_KEY。");
+  }
+
+  const requestBody = {
+    model,
+    temperature,
+    max_tokens: maxTokens,
+    messages,
+  };
+
+  if (responseFormat && aiJsonMode(env)) {
+    requestBody.response_format = { type: "json_object" };
+  }
+
+  const response = await fetchWithTimeout(
+    aiEndpoint(env),
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.AI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    },
+    timeout,
+    timeoutMessage || `AI 请求超时：${model} 没有及时返回。`
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    const error = new Error(explainAiError(response.status, text, model));
+    error.status = response.status;
+    error.raw = text.slice(0, 600);
+    throw error;
+  }
+
+  const payload = await response.json();
+  return {
+    payload,
+    content: payload.choices?.[0]?.message?.content,
+  };
 };
 
 const fallbackBox = (index) => ({
@@ -393,11 +467,99 @@ export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
   return result;
 };
 
-export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrection = "", env }) => {
-  if (!env.AI_API_KEY) {
-    throw new Error("尚未配置通义千问 API Key。请在 Cloudflare 环境变量中设置 AI_API_KEY。");
+const asParagraphs = (value) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean).slice(0, 5);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+};
+
+const normalizeSections = (sections) => {
+  if (!Array.isArray(sections)) return [];
+  return sections
+    .map((section) => ({
+      title: String(section?.title || "照片分析").slice(0, 40),
+      paragraphs: asParagraphs(section?.paragraphs || section?.content || section?.text),
+    }))
+    .filter((section) => section.paragraphs.length)
+    .slice(0, 8);
+};
+
+const sectionsToText = (sections) =>
+  normalizeSections(sections)
+    .map((section) => [`【${section.title}】`, ...section.paragraphs].join("\n"))
+    .join("\n\n");
+
+const normalizeTextAnalysisResult = ({ kind, imageMeta, parsed }) => {
+  const usable = parsed.usable !== false && parsed.needsRetake !== true;
+  const imageQuality = parsed.imageQuality || parsed.photoQuality || "unknown";
+  if (!usable) {
+    return retakeResult({
+      kind,
+      imageMeta,
+      imageQuality,
+      notes: asParagraphs(parsed.notes),
+      reason: parsed.retakeReason || parsed.reason || (kind === "palm" ? "这张手掌照不够完整清楚，暂时不分析。" : "这张面部照不够完整清楚，暂时不分析。"),
+    });
   }
 
+  const catalogMap = byId(kind);
+  const features = (Array.isArray(parsed.features) ? parsed.features : [])
+    .map((feature, index) => {
+      const known = catalogMap.get(feature?.featureId);
+      return {
+        featureId: known?.id || String(feature?.featureId || `analysis_${index + 1}`).slice(0, 40),
+        name: String(feature?.name || known?.name || "观察点").slice(0, 40),
+        category: String(feature?.category || known?.category || "照片分析").slice(0, 40),
+        confidence: Math.max(0, Math.min(1, Number(feature?.confidence ?? 0.78))),
+        evidence: String(feature?.evidence || feature?.observed || "").slice(0, 220),
+        plainSummary: String(feature?.plainSummary || feature?.summary || "").slice(0, 260),
+        advice: String(feature?.advice || "").slice(0, 260),
+        needsReview: Boolean(feature?.needsReview),
+        interpretation: known?.interpretation || "",
+        sourceTitle: known?.sourceTitle || "",
+      };
+    })
+    .filter((feature) => feature.name !== "观察点" || feature.plainSummary || feature.evidence)
+    .slice(0, kind === "palm" ? 8 : 10);
+
+  const sections = normalizeSections(parsed.sections);
+  const reportText = String(parsed.reportText || parsed.analysis || parsed.report || sectionsToText(sections) || parsed.photoSummary || "").trim();
+  return {
+    kind,
+    imageMeta,
+    imageQuality,
+    notes: asParagraphs(parsed.notes),
+    photoSummary: String(parsed.photoSummary || parsed.summary || "").slice(0, 400),
+    reportText,
+    sections,
+    reading: asParagraphs(parsed.reading).slice(0, 6),
+    features,
+  };
+};
+
+const ageFromBirthDate = (birthDate) => {
+  const date = new Date(String(birthDate || ""));
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const monthDelta = now.getMonth() - date.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < date.getDate())) age -= 1;
+  return age > 0 && age < 130 ? `${age}岁` : "";
+};
+
+const genderText = (gender) => (gender === "female" ? "女" : gender === "male" ? "男" : "未填写");
+
+const subjectProfile = (birth = {}) =>
+  [
+    `姓名/代称：${birth.personName || "未填写"}`,
+    `性别：${genderText(birth.gender)}`,
+    `年龄：${ageFromBirthDate(birth.birthDate) || "未填写"}`,
+    `出生日期：${birth.birthDate || "未填写"}`,
+    `出生时间：${birth.birthTime || "未填写"}`,
+    `出生地备注：${birth.birthPlace || "未填写"}`,
+  ].join("；");
+
+export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, birth = {}, userCorrection = "", env }) => {
   if (!String(imageDataUrl || "").startsWith("data:image/")) {
     throw new Error("图片格式无效。");
   }
@@ -405,25 +567,25 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
   const catalog = catalogFor(kind);
   const names = catalog.map((item) => `${item.id}:${item.name}`).join("；");
   const correctionGuide = userCorrection
-    ? `用户反馈说：${userCorrection}。请优先根据这句反馈重新检查，不是让用户标注，而是你自己修正识别。`
+    ? `用户反馈说：${userCorrection}。请按这句反馈重新看照片和重新分析，不要让用户标注。`
     : "";
   const palmGuide =
-    "这是手掌识别。宁可少标，不准乱标，最多返回 5 个最可靠特征。第一步必须先框出整只手掌和手指的 subjectBox，后面所有掌纹点和候选框都必须在 subjectBox 里面；键盘、桌面、背景、手掌外面的东西一律不要标。第二步要先区分掌心和手指：生命线、智慧线、感情线、事业线必须画在掌心肉垫区域，不能画到手指、指节或指根上。生命线、智慧线、感情线大多是弧线，不是两点直线；清楚可画时每条主线必须给 6-10 个沿真实纹路走向的点，让曲线贴着掌纹转弯。生命线：从拇指和食指之间附近起，沿拇指根部大鱼际外缘向手腕方向弧形下行，绝不能画成穿过掌心的直线。智慧线：从虎口附近或生命线起点附近出发，横穿掌心中部，常向小指侧或月丘方向略下斜，也要沿纹路弯折。感情线：在手指根部下方、但仍在掌心上部，从小指侧横向走向食指/中指方向，通常略弯，不能画在手指上。事业线和婚姻线只有非常清楚才返回，不清楚就不要返回。断续线请用 segments 多段返回，不要把断开的地方硬连起来；每段点必须贴着能看到的纹路。若生命线、智慧线、感情线只能给 2-4 个点，说明不够确定，请不要返回这条线。可选特征按优先级：生命线、智慧线、感情线、事业线、婚姻线，然后才是掌色、手型。name 必须用普通名称。";
+    "你现在只做手掌照片原始分析，不输出坐标，不画线，不要求用户标注。先快速判断照片是否完整清晰：掌心是否朝上、手掌是否完整、掌纹是否能看、光线是否够。照片不合格 usable=false，并告诉用户怎么重拍。照片合格就暴力直接分析：整体手型掌色、生命线、智慧线、感情线、事业线、婚姻线、明显特点、现实建议。看不清的地方直接写“不够清楚，先不强断”。";
   const faceGuide =
-    "这是面部识别。宁可少标，不准乱框，最多返回 8 个最可靠特征。第一步必须先框出脸部主体 subjectBox，范围以额头到下巴、左右脸颊为主，不要把大面积头发、背景、衣服算进去。第二步才标五官。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。面部只返回 box，不要返回 points，不要画横跨脸部的线。box 要贴近真实部位，例如印堂只框两眉之间，山根只框鼻梁上方，嘴唇只框上下唇，耳朵只框耳朵，不要大范围乱框；不确定就 needsReview=true 或不要返回。name 必须用普通名称。";
+    "你现在只做面部照片原始分析，不输出坐标，不画框，不要求用户标注。先快速判断照片是否完整清晰：是否正脸、额头到下巴是否完整、五官是否能看、光线是否够。照片不合格 usable=false，并告诉用户怎么重拍。照片合格就暴力直接分析：整体气色、额头、眉毛、眼睛、鼻子、人中/嘴唇、下巴、明显特点、现实建议。看不清的地方直接写“不够清楚，先不强断”。";
   const prompt =
-    `你是图像识别助手，任务是给传统文化测算软件做可视化标注，语言要让普通用户看懂。${correctionGuide}${kind === "palm" ? palmGuide : faceGuide}` +
-    `必须只返回 JSON，不要解释。subjectBox 必填；如果不能先确定主体区域，就返回 {"features":[],"imageQuality":"partial","notes":["主体区域不清楚"]}。可选特征库：${names}。` +
-    `返回格式：{"subjectBox":{"x":12,"y":18,"width":76,"height":78},"features":[{"featureId":"life_line","name":"生命线","category":"主要掌纹","segments":[[{"x":30,"y":38},{"x":25,"y":45},{"x":22,"y":55},{"x":21,"y":66},{"x":24,"y":77},{"x":30,"y":88}]],"box":{"x":18,"y":36,"width":24,"height":54},"confidence":0.82,"evidence":"拇指根部外侧弧线清楚","plainSummary":"简单说，看精力、稳定度和恢复力，不是看寿命。","advice":"近期注意规律作息，重要决定别硬撑。","needsReview":false}],"imageQuality":"clear|blurry|partial","notes":["..."]}。` +
-    `box、points、segments 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，不要画跨过无掌纹的直线，confidence 低于 0.55 且 needsReview=true。`;
+    `你是传统文化照片分析助手。用户信息：${subjectProfile(birth)}。${correctionGuide}${kind === "palm" ? palmGuide : faceGuide}` +
+    `必须只返回 JSON，不要 Markdown。可选观察点 id：${names}。` +
+    `返回格式：{"usable":true,"imageQuality":"clear|partial|blurry","photoSummary":"一句话说照片是否能用","reportText":"直接给用户看的完整分析，按段落写，短平快，像截图示例那样有【核心画像】【性格与思维】【事业与财富】【感情与家庭】【建议】等小标题。","features":[{"featureId":"nose_tip","name":"鼻子","confidence":0.82,"plainSummary":"一句观察","advice":"一句建议"}]}。如果照片不合格，返回 {"usable":false,"imageQuality":"partial","retakeReason":"原因","notes":["请重新拍..."],"reportText":"","features":[]}。` +
+    `注意：这只是传统文化娱乐参考，不要医学、投资、法律结论，不要吓人，不要绝对化。`;
 
-  const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
   const model = env.AI_VISION_MODEL || "qwen3.6-plus";
-  const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
-  const requestBody = {
+  const visionTimeout = timeoutMs(env.AI_VISION_TIMEOUT_MS, 55000);
+  const { content } = await callAiChat({
+    env,
     model,
     temperature: 0,
-    max_tokens: 900,
+    maxTokens: 900,
     messages: [
       {
         role: "user",
@@ -433,35 +595,11 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
         ],
       },
     ],
-  };
-
-  if (env.AI_JSON_MODE === "on") {
-    requestBody.response_format = { type: "json_object" };
-  }
-
-  const response = await fetchWithTimeout(
-    endpoint,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.AI_API_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    },
-    25000,
-    `AI 看图超时：${model} 这次没有在 25 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(explainAiError(response.status, text, model));
-  }
-
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-  const parsed = parseJson(content);
-  return normalizeVisionResult({ kind, imageMeta, parsed });
+    timeout: visionTimeout,
+    timeoutMessage: `AI 看图超时：${model} 这次没有在 ${Math.round(visionTimeout / 1000)} 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`,
+  });
+  const parsed = parseAnalysis(content);
+  return normalizeTextAnalysisResult({ kind, imageMeta, parsed });
 };
 
 const summarizeFeatures = (result) =>
@@ -476,48 +614,56 @@ const summarizeFeatures = (result) =>
     needsReview: feature.needsReview,
   }));
 
+const compactAnalysis = (result) =>
+  [
+    result?.photoSummary ? `照片判断：${result.photoSummary}` : "",
+    result?.reportText || "",
+    ...(result?.sections || []).map((section) => [`【${section.title}】`, ...(section.paragraphs || [])].join("\n")),
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 5000);
+
 export const generatePlainReading = async ({ bazi, palm, face, env }) => {
   if (!env.AI_API_KEY) return null;
 
-  const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
   const model = env.AI_REPORT_MODEL || "qwen3.7-max";
-  const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
   const input = {
     baziSummary: bazi.summary,
     baziElements: bazi.elements,
+    palmPhotoSummary: palm?.photoSummary || "",
+    facePhotoSummary: face?.photoSummary || "",
+    palmRawReport: compactAnalysis(palm),
+    faceRawReport: compactAnalysis(face),
+    palmSections: palm?.sections || [],
+    faceSections: face?.sections || [],
     palmFeatures: summarizeFeatures(palm),
     faceFeatures: summarizeFeatures(face),
   };
   const prompt =
-    "你是传统文化测算报告助手。请按真人看图聊天的口吻写报告，格式参考：先说整体特点，再分 1.生命线 2.智慧线 3.感情线 4.事业线 5.明显特点，最后给现实建议和一句总结。" +
+    "你是传统文化测算报告助手。输入里已经有 Qwen3.6 Plus 对手掌照片和面部照片的原始分析，请以这些原文为主，再结合八字信息做精炼总结，不要重新编照片里看不到的东西。请按真人看图聊天的口吻写报告，格式参考：先给【核心画像】，再分【性格与思维】【事业与财富】【感情与家庭】【现实建议】【一句话总结】。" +
     "要求：普通人能听懂；像认真给朋友分析；不要吓人，不要绝对化，不要编医学/投资结论；可以说“传统里一般会理解为”。" +
     "如果输入没有某条线，就写“这张图里这条线不够清楚，先不强断”。现实建议要温和实用。" +
     "输出必须是 JSON：{\"sections\":[{\"title\":\"整体特点\",\"paragraphs\":[\"...\"]}],\"reading\":[\"一句结论或建议\",...]}。" +
     "sections 输出 7-8 段，每段 title 清楚，paragraphs 每段 2-5 句短句；reading 输出 4 条摘要。输入：" +
     JSON.stringify(input);
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.AI_API_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
+  try {
+    const { content } = await callAiChat({
+      env,
       model,
       temperature: 0.35,
+      maxTokens: 1200,
       messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!response.ok) {
+      timeout: timeoutMs(env.AI_REPORT_TIMEOUT_MS, 45000),
+      timeoutMessage: `AI 报告生成超时：${model} 这次没有及时返回。`,
+    });
+    const parsed = parseJson(content);
+    return {
+      sections: Array.isArray(parsed.sections) ? parsed.sections.slice(0, 9) : [],
+      reading: Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : [],
+    };
+  } catch {
     return null;
   }
-
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-  const parsed = parseJson(content);
-  return {
-    sections: Array.isArray(parsed.sections) ? parsed.sections.slice(0, 9) : [],
-    reading: Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : [],
-  };
 };

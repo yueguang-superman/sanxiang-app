@@ -108,6 +108,7 @@ const loadImage = async (kind, file) => {
   state[`${kind}Image`] = image;
   state[`${kind}Result`] = null;
   clearCorrection(kind);
+  clearPhotoAnalysis(kind);
 
   const preview = $(`${kind}Preview`);
   $(`${kind}Stage`).style.aspectRatio = `${image.width} / ${image.height}`;
@@ -124,6 +125,12 @@ const escapeHtml = (text = "") =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+
+const textBlocks = (text = "") =>
+  escapeHtml(text)
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.replace(/\n/g, "<br>")}</p>`)
+    .join("");
 
 const normalizeBox = (box = {}) => {
   const rawX = Number.isFinite(Number(box.x ?? box.left)) ? Number(box.x ?? box.left) : 0;
@@ -237,43 +244,46 @@ const showCorrection = (kind) => {
 const drawMarks = (kind, result) => {
   const svg = $(`${kind}Marks`);
   svg.innerHTML = "";
-  const features = activeFeatures(result);
-  for (const feature of features) {
-    const box = normalizeBox(feature.box);
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    const drawableSegments = normalizeSegments(feature).filter((segment) => canDrawTrace(kind, feature, segment));
-    const firstPoint = drawableSegments[0]?.[0];
-    if (kind === "palm" && palmMainLineIds.has(feature.featureId) && !drawableSegments.length) {
-      continue;
-    }
+};
 
-    if (drawableSegments.length) {
-      for (const segment of drawableSegments) {
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        line.setAttribute("class", "mark-line");
-        line.setAttribute("d", smoothPath(segment));
-        group.append(line);
-      }
-    } else {
-      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("class", feature.needsReview ? "mark-box mark-candidate" : "mark-box");
-      rect.setAttribute("x", box.x);
-      rect.setAttribute("y", box.y);
-      rect.setAttribute("width", box.width);
-      rect.setAttribute("height", box.height);
-      rect.setAttribute("rx", 1.4);
-      group.append(rect);
-    }
+const clearPhotoAnalysis = (kind) => {
+  const panel = $(`${kind}Analysis`);
+  if (!panel) return;
+  panel.hidden = true;
+  panel.innerHTML = "";
+};
 
-    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("class", "mark-label");
-    label.setAttribute("x", Math.min(94, firstPoint ? firstPoint.x : box.x + 1));
-    label.setAttribute("y", Math.max(5, (firstPoint ? firstPoint.y : box.y) - 1));
-    label.textContent = `${feature.name || feature.featureId || "特殊点"}${feature.needsReview ? "候选" : ""}`;
-
-    group.append(label);
-    svg.append(group);
+const renderPhotoAnalysis = (kind, result) => {
+  const panel = $(`${kind}Analysis`);
+  if (!panel) return;
+  if (!result || result.needsRetake) {
+    clearPhotoAnalysis(kind);
+    return;
   }
+  const title = kind === "palm" ? "手掌照片分析" : "面部照片分析";
+  if (result.reportText) {
+    panel.innerHTML = `<h4>${title}</h4>${textBlocks(result.reportText)}`;
+    panel.hidden = false;
+    return;
+  }
+  const sections = Array.isArray(result.sections) ? result.sections.slice(0, 3) : [];
+  const features = activeFeatures(result).slice(0, 6);
+  const sectionHtml = sections
+    .map(
+      (section) => `
+        <article>
+          <h4>${escapeHtml(section.title || title)}</h4>
+          ${(section.paragraphs || []).slice(0, 3).map((text) => `<p>${escapeHtml(text)}</p>`).join("")}
+        </article>
+      `,
+    )
+    .join("");
+  const featureHtml = features.length
+    ? `<ul>${features.map((feature) => `<li><b>${escapeHtml(feature.name || "观察点")}：</b>${escapeHtml(feature.plainSummary || feature.evidence || "已完成分析。")}</li>`).join("")}</ul>`
+    : "";
+  panel.innerHTML = sectionHtml || `<h4>${title}</h4>${featureHtml || "<p>AI 已完成照片分析，详细内容会进入综合报告。</p>"}`;
+  if (sectionHtml && featureHtml) panel.insertAdjacentHTML("beforeend", featureHtml);
+  panel.hidden = false;
 };
 
 const analyze = async (kind, userCorrection = "") => {
@@ -289,12 +299,14 @@ const analyze = async (kind, userCorrection = "") => {
     const result = await api(`/api/analyze/${kind}`, {
       imageDataUrl: image.dataUrl,
       imageMeta: { width: image.width, height: image.height },
+      birth: birthPayload(),
       userCorrection,
     });
     state[`${kind}Result`] = result;
     drawMarks(kind, state[`${kind}Result`]);
     if (result.needsRetake) {
       clearCorrection(kind);
+      clearPhotoAnalysis(kind);
       const retakeTip = result.notes?.find((note) => note.startsWith("请重新")) || "请重新上传一张更清楚的照片。";
       setMessage(`${kind}Status`, `${result.retakeReason || "这张照片不适合识别。"}${retakeTip ? ` ${retakeTip}` : ""}`, true);
       if (typeof result.remaining === "number") {
@@ -303,14 +315,9 @@ const analyze = async (kind, userCorrection = "") => {
       return result;
     }
     showCorrection(kind);
-    const count = state[`${kind}Result`].features?.length || 0;
-    const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
-    const reviewCount = state[`${kind}Result`].features?.filter((feature) => feature.needsReview).length || 0;
-    const doneText =
-      kind === "palm" && reviewCount
-        ? `已标出 ${count} 个候选位置，掌纹太淡的线已改为候选区`
-        : `已标出 ${count} 个位置`;
-    setMessage(`${kind}Status`, count ? `${doneText}${userCorrection ? "，已参考你的反馈" : ""}` : emptyTip, !count);
+    renderPhotoAnalysis(kind, result);
+    const emptyTip = kind === "palm" ? "照片能看，手掌分析已生成。" : "照片能看，面部分析已生成。";
+    setMessage(`${kind}Status`, `${emptyTip}${userCorrection ? " 已参考你的反馈" : ""}`);
     if (typeof result.remaining === "number") {
       $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
     }
@@ -506,9 +513,12 @@ const guideForFeature = (feature) => {
 };
 
 const renderFeatureList = (title, result) => {
+  if (result?.reportText) {
+    return `<section class="report-section"><h3>${title}</h3><div class="raw-analysis">${textBlocks(result.reportText)}</div></section>`;
+  }
   const features = result?.features || [];
   if (!features.length) {
-    return `<section class="report-section"><h3>${title}</h3><p class="source">这张图暂时没有识别到清楚位置。建议重新上传更清晰的照片：画面里只放手掌或正脸，光线亮一点，不要遮挡。</p></section>`;
+    return `<section class="report-section"><h3>${title}</h3><p class="source">这张图可分析的信息不多。建议重新上传更清晰的照片：画面里只放手掌或正脸，光线亮一点，不要遮挡。</p></section>`;
   }
   const items = features
     .map((feature) => {
@@ -519,11 +529,11 @@ const renderFeatureList = (title, result) => {
         <article class="feature-item">
           <div class="feature-title">
             <strong>${escapeHtml(guide.label)}</strong>
-            <span>AI把握 ${confidence}%${review}</span>
+            <span>照片参考 ${confidence}%${review}</span>
           </div>
           <p>${escapeHtml(guide.plain)}</p>
           <p><b>建议：</b>${escapeHtml(guide.advice.replace(/^建议：/, ""))}</p>
-          <p class="feature-evidence"><b>AI看到：</b>${escapeHtml(feature.evidence || feature.name || "已识别到这个位置")}</p>
+          <p class="feature-evidence"><b>照片里看到：</b>${escapeHtml(feature.evidence || feature.name || "已完成照片分析")}</p>
         </article>
       `;
     })
@@ -585,8 +595,8 @@ const renderReport = (report) => {
 
     ${renderNarrativeSections(report.sections)}
 
-    ${renderFeatureList("手掌识别结果", report.palm)}
-    ${renderFeatureList("面部识别结果", report.face)}
+    ${renderFeatureList("手掌照片分析", report.palm)}
+    ${renderFeatureList("面部照片分析", report.face)}
 
     <section class="report-section">
       <h3>综合解读</h3>
@@ -595,7 +605,7 @@ const renderReport = (report) => {
 
     <section class="report-section">
       <h3>参考来源</h3>
-      <p class="source">参考《周易》的取象方法，也借用了《麻衣神相》《神相全编》里的手相、面相部位说法，以及《三命通会》《滴天髓》《渊海子平》里的四柱五行思路。AI 负责看图标位置，解释由规则库生成。</p>
+      <p class="source">参考《周易》的取象方法，也借用了《麻衣神相》《神相全编》里的手相、面相部位说法，以及《三命通会》《滴天髓》《渊海子平》里的四柱五行思路。AI 只做照片清晰度判断和文字分析，不再在图上画线框。</p>
     </section>
   `;
 };
@@ -645,6 +655,7 @@ const clearAll = () => {
     $(`${kind}Empty`).hidden = false;
     $(`${kind}Marks`).innerHTML = "";
     clearCorrection(kind);
+    clearPhotoAnalysis(kind);
     setMessage(`${kind}Status`, "");
   }
 };

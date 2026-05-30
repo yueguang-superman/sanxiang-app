@@ -496,6 +496,37 @@ button.primary {
   stroke-width: 0.5px;
 }
 
+.photo-analysis {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(170, 116, 31, 0.22);
+  background: rgba(255, 253, 246, 0.68);
+}
+
+.photo-analysis h4 {
+  margin: 0 0 8px;
+  color: #4b320f;
+  font-size: 17px;
+}
+
+.photo-analysis p {
+  margin: 7px 0 0;
+  color: var(--ink);
+  line-height: 1.72;
+}
+
+.raw-analysis p {
+  margin: 9px 0;
+  line-height: 1.78;
+}
+
+.photo-analysis ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--ink);
+  line-height: 1.7;
+}
+
 .correction-panel {
   margin-top: 14px;
   padding-top: 14px;

@@ -4,7 +4,7 @@ import { calculateBazi } from "../_shared/bazi.js";
 import { json, readJson } from "../_shared/http.js";
 
 const scoreFrom = (bazi, palm, face) => {
-  const featureCount = (palm?.features?.length || 0) + (face?.features?.length || 0);
+  const featureCount = (palm?.reportText ? 5 : palm?.features?.length || 0) + (face?.reportText ? 5 : face?.features?.length || 0);
   const elementValues = Object.values(bazi.elements);
   const spread = Math.max(...elementValues) - Math.min(...elementValues);
   return Math.max(42, Math.min(96, 68 + Math.min(16, featureCount) - spread * 3));
@@ -14,28 +14,44 @@ const featureNames = (result) => (result?.features || []).slice(0, 6).map((item)
 
 const hasFeature = (result, id) => (result?.features || []).some((item) => item.featureId === id);
 
+const sectionParagraphs = (result, title) =>
+  (result?.sections || [])
+    .filter((section) => !title || section.title === title)
+    .flatMap((section) => section.paragraphs || [])
+    .slice(0, 4);
+
 const buildReading = (bazi, palm, face) => {
-  const palmNames = featureNames(palm) || "没有识别到清楚掌纹";
-  const faceNames = featureNames(face) || "没有识别到清楚面部特征";
+  const palmNames = featureNames(palm) || "手掌照片可分析信息不多";
+  const faceNames = featureNames(face) || "面部照片可分析信息不多";
   return [
     `生日信息显示：${bazi.summary}`,
-    `手掌照片里，本次主要看到：${palmNames}。重点先看生命线、智慧线、感情线、事业线、婚姻线这些大家能看懂的线，再看细纹和掌色。`,
-    `面部照片里，本次主要看到：${faceNames}。重点看印堂、眉眼、鼻子、人中、嘴唇、耳朵、下巴，以及痣疤和明显气色。`,
+    palm?.reportText ? `手掌照片原始分析已生成，综合报告会按这份原文精炼。` : `手掌照片分析重点：${palmNames}。看不清的掌纹不要强断，能看清的才写进报告。`,
+    face?.reportText ? `面部照片原始分析已生成，综合报告会按这份原文精炼。` : `面部照片分析重点：${faceNames}。重点看整体气色、额头、眉眼、鼻子、嘴唇和下巴。`,
     `综合建议：先看重复出现的提醒。如果生日信息、手掌、面部都在说“压力大、方向乱、关系耗神”，那就优先调整作息、财务和沟通方式；只出现一次的内容，当作娱乐参考即可。`,
     `提醒：这是传统文化娱乐和自我观察工具，不能替代医学、法律、投资或人生重大决定。`,
   ];
 };
 
 const buildSections = (bazi, palm, face) => {
-  const palmNames = featureNames(palm) || "没有识别到清楚掌纹";
-  const faceNames = featureNames(face) || "没有识别到清楚面部特征";
+  const palmNames = featureNames(palm) || "手掌照片可分析信息不多";
+  const faceNames = featureNames(face) || "面部照片可分析信息不多";
+  const palmPhoto = sectionParagraphs(palm);
+  const facePhoto = sectionParagraphs(face);
   return [
     {
       title: "整体特点",
       paragraphs: [
-        `这次主要识别到：${palmNames}。面部主要看到：${faceNames}。`,
+        `这次手掌照片主要分析到：${palmNames}。面部照片主要分析到：${faceNames}。`,
         `传统看法里，报告不是单看一条线，而是把生日信息、手掌、面部放在一起看重复出现的提醒。`,
       ],
+    },
+    {
+      title: "手掌照片",
+      paragraphs: palmPhoto.length ? palmPhoto : ["手掌照片里能看清的信息不多，掌纹部分会谨慎处理，不强行下结论。"],
+    },
+    {
+      title: "面部照片",
+      paragraphs: facePhoto.length ? facePhoto : ["面部照片里能看清的信息不多，面相部分会谨慎处理，不强行下结论。"],
     },
     {
       title: "1. 生命线",

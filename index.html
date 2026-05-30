@@ -36,7 +36,7 @@
               </svg>
             </div>
           </div>
-          <p>上传手掌和正脸照片，再填出生时间。系统会先标位置，再生成通俗报告。</p>
+          <p>上传手掌和正脸照片，再填出生时间。系统先判断照片是否清楚，再直接生成通俗分析。</p>
         </section>
 
         <section class="access-panel" id="accessPanel">
@@ -57,7 +57,7 @@
 
         <section class="note">
           <h2>怎么理解</h2>
-          <p>这是传统文化娱乐工具。AI 负责看图，把生命线、事业线、婚姻线、印堂、鼻相等位置标出来；后面的解释参考《周易》《麻衣神相》《神相全编》《三命通会》等资料，用大白话写出来。</p>
+          <p>这是传统文化娱乐工具。AI 不再画线框，只先判断照片是否完整清楚；能看清就按手相、面相、生辰八字写成大白话报告。</p>
         </section>
       </aside>
 
@@ -113,7 +113,7 @@
             <div class="section-head">
               <div>
                 <p class="eyebrow">AI Vision</p>
-                <h2>AI 看图标位置</h2>
+                <h2>AI 直接看图分析</h2>
               </div>
               <span class="status-pill">图片不会长期保存</span>
             </div>
@@ -123,7 +123,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>手掌图</h3>
-                    <p>请拍清楚掌心，手掌尽量占满画面。重点会标生命线、智慧线、感情线、事业线、婚姻线。</p>
+                    <p>请拍清楚掌心，手掌尽量占满画面。系统会先看照片是否能用，再分析生命线、智慧线、感情线、事业线、婚姻线。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -139,12 +139,13 @@
                   <button id="analyzePalm" type="button">分析手掌照片</button>
                   <span id="palmStatus" class="mini"></span>
                 </div>
+                <div class="photo-analysis" id="palmAnalysis" hidden></div>
                 <div class="correction-panel" id="palmCorrectionPanel" hidden>
                   <div class="correction-head">
-                    <strong>觉得标错了？</strong>
-                    <span>简单说哪里不对，AI 会自己重标</span>
+                    <strong>觉得分析不准？</strong>
+                    <span>简单说哪里不对，AI 会自己重看</span>
                   </div>
-                  <textarea id="palmCorrection" placeholder="例如：生命线画太直了；事业线不是那里；婚姻线看不清先别标"></textarea>
+                  <textarea id="palmCorrection" placeholder="例如：生命线其实不清楚；事业线不要强断；掌心状态说得不对"></textarea>
                   <button id="reanalyzePalm" type="button">按我的反馈重新分析</button>
                 </div>
               </article>
@@ -153,7 +154,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>面部图</h3>
-                    <p>请上传清楚正脸。重点会标印堂、眉眼、鼻子、人中、嘴唇、耳朵、下巴、痣疤气色。</p>
+                    <p>请上传清楚正脸。系统会先看额头到下巴、五官是否完整，再分析印堂、眉眼、鼻子、人中、嘴唇、下巴等。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -169,12 +170,13 @@
                   <button id="analyzeFace" type="button">分析面部照片</button>
                   <span id="faceStatus" class="mini"></span>
                 </div>
+                <div class="photo-analysis" id="faceAnalysis" hidden></div>
                 <div class="correction-panel" id="faceCorrectionPanel" hidden>
                   <div class="correction-head">
-                    <strong>觉得标错了？</strong>
-                    <span>简单说哪里不对，AI 会自己重标</span>
+                    <strong>觉得分析不准？</strong>
+                    <span>简单说哪里不对，AI 会自己重看</span>
                   </div>
-                  <textarea id="faceCorrection" placeholder="例如：印堂框太大了；耳朵不需要标；山根位置错了"></textarea>
+                  <textarea id="faceCorrection" placeholder="例如：额头没有那么饱满；眼神状态说得不对；鼻子部分重新看"></textarea>
                   <button id="reanalyzeFace" type="button">按我的反馈重新分析</button>
                 </div>
               </article>
@@ -191,7 +193,7 @@
         <section class="report-panel" id="report">
           <div class="report-empty">
             <h2>还没有生成报告</h2>
-            <p>先填写出生信息，再上传手掌和面部照片。系统会把看见的位置标出来，并生成一份容易看懂的综合报告。</p>
+            <p>先填写出生信息，再上传手掌和面部照片。系统会先判断照片是否清楚，再生成一份容易看懂的综合报告。</p>
           </div>
         </section>
       </section>

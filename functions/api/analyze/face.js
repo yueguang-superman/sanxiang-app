@@ -12,6 +12,7 @@ export const onRequestPost = async ({ request, env }) => {
       kind: "face",
       imageDataUrl: body.imageDataUrl,
       imageMeta: body.imageMeta,
+      birth: body.birth,
       userCorrection: body.userCorrection,
       env,
     });
