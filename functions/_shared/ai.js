@@ -158,9 +158,9 @@ const allSegmentsInside = (segments, region) => segments.every((segment) => segm
 
 const palmCoreBox = (subjectBox) => ({
   x: subjectBox.x + subjectBox.width * 0.04,
-  y: subjectBox.y + subjectBox.height * 0.24,
+  y: subjectBox.y + subjectBox.height * 0.32,
   width: subjectBox.width * 0.92,
-  height: subjectBox.height * 0.72,
+  height: subjectBox.height * 0.62,
 });
 
 const segmentDirection = (points) => {
@@ -229,6 +229,37 @@ const faceBoxLimits = {
   moles_scars_qi: { width: 24, height: 20 },
 };
 
+const relativeBox = (box, region) => ({
+  x: (box.x - region.x) / region.width,
+  y: (box.y - region.y) / region.height,
+  width: box.width / region.width,
+  height: box.height / region.height,
+  centerX: (box.x + box.width / 2 - region.x) / region.width,
+  centerY: (box.y + box.height / 2 - region.y) / region.height,
+});
+
+const between = (value, min, max) => value >= min && value <= max;
+
+const validFaceBox = (featureId, box, subjectBox) => {
+  const rel = relativeBox(box, subjectBox);
+  const compact = rel.width <= 0.82 && rel.height <= 0.45;
+  if (!compact) return false;
+
+  if (featureId === "forehead") return between(rel.centerY, 0.04, 0.28) && rel.height <= 0.24;
+  if (featureId === "yintang") return between(rel.centerX, 0.38, 0.62) && between(rel.centerY, 0.18, 0.38) && rel.width <= 0.24 && rel.height <= 0.2;
+  if (featureId === "brows") return between(rel.centerY, 0.2, 0.4) && rel.height <= 0.18;
+  if (featureId === "eyes") return between(rel.centerY, 0.28, 0.5) && rel.height <= 0.22;
+  if (featureId === "nose_root") return between(rel.centerX, 0.38, 0.62) && between(rel.centerY, 0.32, 0.52) && rel.width <= 0.26 && rel.height <= 0.26;
+  if (featureId === "nose_tip") return between(rel.centerX, 0.34, 0.66) && between(rel.centerY, 0.44, 0.66) && rel.width <= 0.34 && rel.height <= 0.3;
+  if (featureId === "philtrum") return between(rel.centerX, 0.38, 0.62) && between(rel.centerY, 0.56, 0.74) && rel.width <= 0.24 && rel.height <= 0.2;
+  if (featureId === "mouth") return between(rel.centerX, 0.3, 0.7) && between(rel.centerY, 0.62, 0.8) && rel.width <= 0.5 && rel.height <= 0.2;
+  if (featureId === "law_lines") return between(rel.centerX, 0.22, 0.78) && between(rel.centerY, 0.48, 0.74) && rel.height <= 0.36;
+  if (featureId === "ears") return (rel.centerX <= 0.16 || rel.centerX >= 0.84) && between(rel.centerY, 0.28, 0.68) && rel.height <= 0.5;
+  if (featureId === "chin") return between(rel.centerX, 0.28, 0.72) && between(rel.centerY, 0.74, 0.96) && rel.height <= 0.24;
+  if (featureId === "moles_scars_qi") return rel.width <= 0.32 && rel.height <= 0.28;
+  return true;
+};
+
 const validFeatureGeometry = ({ kind, featureId, box, segments, subjectBox }) => {
   if (!box && !segments.length) return false;
 
@@ -244,77 +275,11 @@ const validFeatureGeometry = ({ kind, featureId, box, segments, subjectBox }) =>
   const limit = faceBoxLimits[featureId] || { width: 46, height: 32 };
   if (box.width > Math.min(limit.width, subjectBox.width * 0.82)) return false;
   if (box.height > Math.min(limit.height, subjectBox.height * 0.45)) return false;
-  return true;
+  return validFaceBox(featureId, box, subjectBox);
 };
 
-export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrection = "", env }) => {
-  if (!env.AI_API_KEY) {
-    throw new Error("尚未配置通义千问 API Key。请在 Cloudflare 环境变量中设置 AI_API_KEY。");
-  }
-
-  if (!String(imageDataUrl || "").startsWith("data:image/")) {
-    throw new Error("图片格式无效。");
-  }
-
+export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
   const catalog = catalogFor(kind);
-  const names = catalog.map((item) => `${item.id}:${item.name}`).join("；");
-  const correctionGuide = userCorrection
-    ? `用户反馈说：${userCorrection}。请优先根据这句反馈重新检查，不是让用户标注，而是你自己修正识别。`
-    : "";
-  const palmGuide =
-    "这是手掌识别。第一步必须先框出整只手掌和手指的 subjectBox，后面所有掌纹点和候选框都必须在 subjectBox 里面；键盘、桌面、背景、手掌外面的东西一律不要标。第二步要先区分掌心和手指：生命线、智慧线、感情线、事业线必须画在掌心肉垫区域，不能画到手指、指节或指根上。生命线、智慧线、感情线大多是弧线，不是两点直线；清楚可画时每条主线必须给 6-10 个沿真实纹路走向的点，让曲线贴着掌纹转弯。生命线：从拇指和食指之间附近起，沿拇指根部大鱼际外缘向手腕方向弧形下行，绝不能画成穿过掌心的直线。智慧线：从虎口附近或生命线起点附近出发，横穿掌心中部，常向小指侧或月丘方向略下斜，也要沿纹路弯折。感情线：在手指根部下方、但仍在掌心上部，从小指侧横向走向食指/中指方向，通常略弯，不能画在手指上。事业线：从掌底或掌心下方往中指方向上行，通常偏竖，常淡或断续，不清楚就不要返回。婚姻线：在小指下方掌边，是短横线，可以 2-4 个点，不应画成横穿掌心的长线。断续线请用 segments 多段返回，不要把断开的地方硬连起来；每段点必须贴着能看到的纹路。若生命线、智慧线、感情线只能给 2-4 个点，说明不够确定，请不要返回这条线。可选特征按优先级：生命线、智慧线、感情线、事业线、婚姻线，然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫。name 必须用普通名称。";
-  const faceGuide =
-    "这是面部识别。第一步必须先框出脸部主体 subjectBox，范围以额头到下巴、左右脸颊为主，不要把大面积头发、背景、衣服算进去。第二步才标五官。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。面部只返回 box，不要返回 points，不要画横跨脸部的线。box 要贴近真实部位，例如印堂只框两眉之间，山根只框鼻梁上方，耳朵只框耳朵，不要大范围乱框；不确定就 needsReview=true 或不要返回。name 必须用普通名称。";
-  const prompt =
-    `你是图像识别助手，任务是给传统文化测算软件做可视化标注，语言要让普通用户看懂。${correctionGuide}${kind === "palm" ? palmGuide : faceGuide}` +
-    `必须只返回 JSON，不要解释。subjectBox 必填；如果不能先确定主体区域，就返回 {"features":[],"imageQuality":"partial","notes":["主体区域不清楚"]}。可选特征库：${names}。` +
-    `返回格式：{"subjectBox":{"x":12,"y":18,"width":76,"height":78},"features":[{"featureId":"life_line","name":"生命线","category":"主要掌纹","segments":[[{"x":30,"y":38},{"x":25,"y":45},{"x":22,"y":55},{"x":21,"y":66},{"x":24,"y":77},{"x":30,"y":88}]],"box":{"x":18,"y":36,"width":24,"height":54},"confidence":0.82,"evidence":"拇指根部外侧弧线清楚","plainSummary":"简单说，看精力、稳定度和恢复力，不是看寿命。","advice":"近期注意规律作息，重要决定别硬撑。","needsReview":false}],"imageQuality":"clear|blurry|partial","notes":["..."]}。` +
-    `box、points、segments 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，不要画跨过无掌纹的直线，confidence 低于 0.55 且 needsReview=true。`;
-
-  const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
-  const model = env.AI_VISION_MODEL || "qwen3.6-plus";
-  const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
-  const requestBody = {
-    model,
-    temperature: 0,
-    max_tokens: 1500,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: imageDataUrl } },
-        ],
-      },
-    ],
-  };
-
-  if (env.AI_JSON_MODE === "on") {
-    requestBody.response_format = { type: "json_object" };
-  }
-
-  const response = await fetchWithTimeout(
-    endpoint,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.AI_API_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    },
-    45000,
-    `AI 看图超时：${model} 这次没有在 45 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(explainAiError(response.status, text, model));
-  }
-
-  const payload = await response.json();
-  const content = payload.choices?.[0]?.message?.content;
-  const parsed = parseJson(content);
   const catalogMap = byId(kind);
   const features = Array.isArray(parsed.features) ? parsed.features : [];
   const subjectBox = subjectBoxFrom(kind, parsed);
@@ -331,6 +296,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
       features: [],
     };
   }
+
   const rejected = [];
   const normalizedFeatures = features
     .slice(0, 18)
@@ -395,6 +361,77 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
     ],
     features: normalizedFeatures,
   };
+};
+
+export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrection = "", env }) => {
+  if (!env.AI_API_KEY) {
+    throw new Error("尚未配置通义千问 API Key。请在 Cloudflare 环境变量中设置 AI_API_KEY。");
+  }
+
+  if (!String(imageDataUrl || "").startsWith("data:image/")) {
+    throw new Error("图片格式无效。");
+  }
+
+  const catalog = catalogFor(kind);
+  const names = catalog.map((item) => `${item.id}:${item.name}`).join("；");
+  const correctionGuide = userCorrection
+    ? `用户反馈说：${userCorrection}。请优先根据这句反馈重新检查，不是让用户标注，而是你自己修正识别。`
+    : "";
+  const palmGuide =
+    "这是手掌识别。宁可少标，不准乱标，最多返回 5 个最可靠特征。第一步必须先框出整只手掌和手指的 subjectBox，后面所有掌纹点和候选框都必须在 subjectBox 里面；键盘、桌面、背景、手掌外面的东西一律不要标。第二步要先区分掌心和手指：生命线、智慧线、感情线、事业线必须画在掌心肉垫区域，不能画到手指、指节或指根上。生命线、智慧线、感情线大多是弧线，不是两点直线；清楚可画时每条主线必须给 6-10 个沿真实纹路走向的点，让曲线贴着掌纹转弯。生命线：从拇指和食指之间附近起，沿拇指根部大鱼际外缘向手腕方向弧形下行，绝不能画成穿过掌心的直线。智慧线：从虎口附近或生命线起点附近出发，横穿掌心中部，常向小指侧或月丘方向略下斜，也要沿纹路弯折。感情线：在手指根部下方、但仍在掌心上部，从小指侧横向走向食指/中指方向，通常略弯，不能画在手指上。事业线和婚姻线只有非常清楚才返回，不清楚就不要返回。断续线请用 segments 多段返回，不要把断开的地方硬连起来；每段点必须贴着能看到的纹路。若生命线、智慧线、感情线只能给 2-4 个点，说明不够确定，请不要返回这条线。可选特征按优先级：生命线、智慧线、感情线、事业线、婚姻线，然后才是掌色、手型。name 必须用普通名称。";
+  const faceGuide =
+    "这是面部识别。宁可少标，不准乱框，最多返回 8 个最可靠特征。第一步必须先框出脸部主体 subjectBox，范围以额头到下巴、左右脸颊为主，不要把大面积头发、背景、衣服算进去。第二步才标五官。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。面部只返回 box，不要返回 points，不要画横跨脸部的线。box 要贴近真实部位，例如印堂只框两眉之间，山根只框鼻梁上方，嘴唇只框上下唇，耳朵只框耳朵，不要大范围乱框；不确定就 needsReview=true 或不要返回。name 必须用普通名称。";
+  const prompt =
+    `你是图像识别助手，任务是给传统文化测算软件做可视化标注，语言要让普通用户看懂。${correctionGuide}${kind === "palm" ? palmGuide : faceGuide}` +
+    `必须只返回 JSON，不要解释。subjectBox 必填；如果不能先确定主体区域，就返回 {"features":[],"imageQuality":"partial","notes":["主体区域不清楚"]}。可选特征库：${names}。` +
+    `返回格式：{"subjectBox":{"x":12,"y":18,"width":76,"height":78},"features":[{"featureId":"life_line","name":"生命线","category":"主要掌纹","segments":[[{"x":30,"y":38},{"x":25,"y":45},{"x":22,"y":55},{"x":21,"y":66},{"x":24,"y":77},{"x":30,"y":88}]],"box":{"x":18,"y":36,"width":24,"height":54},"confidence":0.82,"evidence":"拇指根部外侧弧线清楚","plainSummary":"简单说，看精力、稳定度和恢复力，不是看寿命。","advice":"近期注意规律作息，重要决定别硬撑。","needsReview":false}],"imageQuality":"clear|blurry|partial","notes":["..."]}。` +
+    `box、points、segments 坐标都用百分比 0-100。只标有视觉依据的内容；看不清时不要硬编，不要画跨过无掌纹的直线，confidence 低于 0.55 且 needsReview=true。`;
+
+  const baseUrl = env.AI_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  const model = env.AI_VISION_MODEL || "qwen3.6-plus";
+  const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
+  const requestBody = {
+    model,
+    temperature: 0,
+    max_tokens: 900,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+  };
+
+  if (env.AI_JSON_MODE === "on") {
+    requestBody.response_format = { type: "json_object" };
+  }
+
+  const response = await fetchWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.AI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    },
+    25000,
+    `AI 看图超时：${model} 这次没有在 25 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(explainAiError(response.status, text, model));
+  }
+
+  const payload = await response.json();
+  const content = payload.choices?.[0]?.message?.content;
+  const parsed = parseJson(content);
+  return normalizeVisionResult({ kind, imageMeta, parsed });
 };
 
 const summarizeFeatures = (result) =>

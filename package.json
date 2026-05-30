@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node ./scripts/check.mjs"
+    "check": "node ./scripts/check.mjs && node ./scripts/check-annotation-rules.mjs"
   }
 }
