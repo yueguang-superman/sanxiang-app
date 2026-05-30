@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+const publicUrl = "https://sanxiang-lgl.pages.dev";
+const isLocalFile = window.location.protocol === "file:";
 
 const state = {
   accessCode: sessionStorage.getItem("accessCode") || "",
@@ -11,18 +13,39 @@ const state = {
 
 localStorage.setItem("anonymousId", state.anonymousId);
 
+const apiErrorMessage = (path, error) => {
+  if (isLocalFile) {
+    return `你现在打开的是本地文件，本地不能连接 AI 后端。请打开公网地址：${publicUrl}`;
+  }
+  if (navigator.onLine === false) {
+    return "当前设备好像断网了，请先检查网络。";
+  }
+  if (error?.name === "AbortError") {
+    return "后端响应超时了，请稍后重试。";
+  }
+  return `页面连不上后端接口 ${path}。请等 Cloudflare 部署完成后刷新；如果还不行，检查 Pages Functions 和环境变量。`;
+};
+
 const api = async (path, body) => {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      accessCode: state.accessCode,
-      anonymousId: state.anonymousId,
-      ...body,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        accessCode: state.accessCode,
+        anonymousId: state.anonymousId,
+        ...body,
+      }),
+    });
+  } catch (error) {
+    throw new Error(apiErrorMessage(path, error));
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`后端接口 ${path} 没部署出来。请检查 Cloudflare Pages 是否已经完成部署。`);
+    }
     throw new Error(data.error || `请求失败：${response.status}`);
   }
   return data;
@@ -636,7 +659,11 @@ $("readingForm").addEventListener("submit", submitReport);
 $("fillDemo").addEventListener("click", fillDemo);
 $("clearAll").addEventListener("click", clearAll);
 
-if (state.accessCode) {
+if (isLocalFile) {
+  $("workspace").classList.add("locked");
+  $("quotaStatus").textContent = "本地预览不能调用 AI";
+  setMessage("accessMessage", `当前是本地预览，只能看界面，不能测算。请打开：${publicUrl}`, true);
+} else if (state.accessCode) {
   $("accessCode").value = state.accessCode;
   unlock();
 }
