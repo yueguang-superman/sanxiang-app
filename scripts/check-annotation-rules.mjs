@@ -36,6 +36,7 @@ const palmBad = normalizeVisionResult({
   },
 });
 assert(palmBad.features.length === 0, "错误掌纹应该全部被拦截");
+assert(palmBad.needsRetake === true, "错误掌纹应该要求重新上传照片");
 
 const palmGood = normalizeVisionResult({
   kind: "palm",
@@ -68,6 +69,42 @@ const palmGood = normalizeVisionResult({
   },
 });
 assert(featureIds(palmGood).join(",") === "head_line,heart_line,life_line", "清楚的三大主纹应该保留");
+assert(!palmGood.needsRetake, "清楚掌纹不应该要求重拍");
+
+const palmNoSubject = normalizeVisionResult({
+  kind: "palm",
+  imageMeta: { width: 960, height: 1280 },
+  parsed: {
+    features: [
+      {
+        featureId: "life_line",
+        name: "生命线",
+        confidence: 0.92,
+        segments: [[{ x: 34, y: 38 }, { x: 27, y: 48 }, { x: 22, y: 62 }, { x: 23, y: 76 }, { x: 30, y: 88 }]],
+        box: { x: 20, y: 36, width: 18, height: 54 },
+      },
+    ],
+  },
+});
+assert(palmNoSubject.needsRetake === true, "AI 未锁定手掌区域时应该要求重拍");
+
+const palmTooFewMainLines = normalizeVisionResult({
+  kind: "palm",
+  imageMeta: { width: 960, height: 1280 },
+  parsed: {
+    subjectBox: { x: 10, y: 5, width: 80, height: 90 },
+    features: [
+      {
+        featureId: "life_line",
+        name: "生命线",
+        confidence: 0.88,
+        segments: [[{ x: 34, y: 38 }, { x: 27, y: 48 }, { x: 22, y: 62 }, { x: 23, y: 76 }, { x: 30, y: 88 }]],
+        box: { x: 20, y: 36, width: 18, height: 54 },
+      },
+    ],
+  },
+});
+assert(palmTooFewMainLines.needsRetake === true, "只识别到一条主掌纹时应该要求重拍");
 
 const faceBad = normalizeVisionResult({
   kind: "face",
@@ -82,6 +119,7 @@ const faceBad = normalizeVisionResult({
   },
 });
 assert(faceBad.features.length === 0, "错误面部大框应该全部被拦截");
+assert(faceBad.needsRetake === true, "错误面部标注应该要求重新上传照片");
 
 const faceGood = normalizeVisionResult({
   kind: "face",
@@ -97,5 +135,6 @@ const faceGood = normalizeVisionResult({
   },
 });
 assert(featureIds(faceGood).join(",") === "eyes,mouth,nose_tip,yintang", "合理面部小框应该保留");
+assert(!faceGood.needsRetake, "清楚面部不应该要求重拍");
 
 console.log("Annotation rules passed");

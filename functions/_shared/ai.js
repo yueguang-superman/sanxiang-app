@@ -260,6 +260,22 @@ const validFaceBox = (featureId, box, subjectBox) => {
   return true;
 };
 
+const retakeAdvice = (kind) =>
+  kind === "palm"
+    ? "请重新拍手掌：掌心朝上，手掌占满画面，尽量不要拍到键盘、桌面杂物，光线要亮。"
+    : "请重新拍正脸：脸在画面中间，额头到下巴完整，少拍头发和衣服，光线要亮。";
+
+const retakeResult = ({ kind, imageMeta, subjectBox, imageQuality, notes, reason }) => ({
+  kind,
+  imageMeta,
+  subjectBox: subjectBox || fallbackSubjectBox(kind),
+  imageQuality: imageQuality || "partial",
+  notes: [...(notes || []), reason, retakeAdvice(kind)],
+  features: [],
+  needsRetake: true,
+  retakeReason: reason,
+});
+
 const validFeatureGeometry = ({ kind, featureId, box, segments, subjectBox }) => {
   if (!box && !segments.length) return false;
 
@@ -284,17 +300,16 @@ export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
   const features = Array.isArray(parsed.features) ? parsed.features : [];
   const subjectBox = subjectBoxFrom(kind, parsed);
   if (!subjectBox) {
-    return {
+    return retakeResult({
       kind,
       imageMeta,
       subjectBox: fallbackSubjectBox(kind),
       imageQuality: parsed.imageQuality || "unknown",
       notes: [
         ...(Array.isArray(parsed.notes) ? parsed.notes.slice(0, 3) : []),
-        kind === "palm" ? "AI 没有先锁定手掌区域，已停止标注，避免乱画到背景上。" : "AI 没有先锁定脸部区域，已停止标注，避免乱框到背景上。",
       ],
-      features: [],
-    };
+      reason: kind === "palm" ? "AI 没有先锁定手掌区域，已停止标注，避免乱画到背景上。" : "AI 没有先锁定脸部区域，已停止标注，避免乱框到背景上。",
+    });
   }
 
   const rejected = [];
@@ -350,7 +365,7 @@ export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
     .filter(Boolean)
     .sort((a, b) => (featurePriority.get(a.featureId) ?? 99) - (featurePriority.get(b.featureId) ?? 99));
 
-  return {
+  const result = {
     kind,
     imageMeta,
     subjectBox,
@@ -361,6 +376,21 @@ export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
     ],
     features: normalizedFeatures,
   };
+  const reliableCount = normalizedFeatures.filter((feature) => !feature.needsReview).length;
+  const mainPalmCount = normalizedFeatures.filter((feature) => ["life_line", "head_line", "heart_line"].includes(feature.featureId)).length;
+  if (kind === "palm" && (reliableCount < 2 || mainPalmCount < 2)) {
+    return retakeResult({
+      ...result,
+      reason: "这张手掌照没有识别到至少两条可靠主掌纹，继续分析容易乱画。",
+    });
+  }
+  if (kind === "face" && reliableCount < 2) {
+    return retakeResult({
+      ...result,
+      reason: "这张面部照可确认的位置太少，继续分析容易乱框。",
+    });
+  }
+  return result;
 };
 
 export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrection = "", env }) => {

@@ -293,6 +293,15 @@ const analyze = async (kind, userCorrection = "") => {
     });
     state[`${kind}Result`] = result;
     drawMarks(kind, state[`${kind}Result`]);
+    if (result.needsRetake) {
+      clearCorrection(kind);
+      const retakeTip = result.notes?.find((note) => note.startsWith("请重新")) || "请重新上传一张更清楚的照片。";
+      setMessage(`${kind}Status`, `${result.retakeReason || "这张照片不适合识别。"}${retakeTip ? ` ${retakeTip}` : ""}`, true);
+      if (typeof result.remaining === "number") {
+        $("quotaStatus").textContent = `今日剩余 ${result.remaining} 次`;
+      }
+      return result;
+    }
     showCorrection(kind);
     const count = state[`${kind}Result`].features?.length || 0;
     const emptyTip = kind === "palm" ? "没识别到清楚掌纹，请换一张掌心更近、更清晰的照片。" : "没识别到清楚面部特征，请换一张正脸照片。";
@@ -324,6 +333,7 @@ const birthPayload = () => ({
 const reviewedResult = (kind) => {
   const result = state[`${kind}Result`];
   if (!result) return null;
+  if (result.needsRetake) return null;
   return result;
 };
 
