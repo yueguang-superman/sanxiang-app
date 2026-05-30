@@ -77,7 +77,7 @@ const unlock = async () => {
   }
 };
 
-const compressImage = (file, maxSize = 1400, quality = 0.82) =>
+const compressImage = (file, maxSize = 960, quality = 0.72) =>
   new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();

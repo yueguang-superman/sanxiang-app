@@ -20,6 +20,9 @@ const parseJson = (text) => {
 
 const explainAiError = (status, text, model) => {
   const raw = String(text || "");
+  if ([408, 504, 524].includes(status)) {
+    return `AI 看图超时：${model} 这次没有及时返回。请换一张更近、更亮、背景更少的照片后重试；如果连续出现，说明百炼接口当前较慢。`;
+  }
   if (status === 400 && /InvalidParameter|messages|image|video|vision/i.test(raw)) {
     return `AI 看图失败：当前看图模型 ${model} 不接受这张图片。请确认 Cloudflare 里的 AI_VISION_MODEL 填的是支持图片/视频理解的模型，例如 qwen3.6-plus。`;
   }
@@ -30,6 +33,21 @@ const explainAiError = (status, text, model) => {
     return "AI 看图失败：调用太频繁或额度用完了，稍后再试，或者检查百炼额度。";
   }
   return `AI 看图失败：接口返回 ${status}。请检查百炼 API Key、额度和模型名称。`;
+};
+
+const fetchWithTimeout = async (url, options, timeoutMs, timeoutMessage) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 const fallbackBox = (index) => ({
@@ -258,7 +276,8 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
   const endpoint = baseUrl.replace(/\/$/, "") + "/chat/completions";
   const requestBody = {
     model,
-    temperature: 0.15,
+    temperature: 0,
+    max_tokens: 1500,
     messages: [
       {
         role: "user",
@@ -274,14 +293,19 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
     requestBody.response_format = { type: "json_object" };
   }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.AI_API_KEY}`,
-      "content-type": "application/json",
+  const response = await fetchWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.AI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
     },
-    body: JSON.stringify(requestBody),
-  });
+    45000,
+    `AI 看图超时：${model} 这次没有在 45 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`
+  );
 
   if (!response.ok) {
     const text = await response.text();
