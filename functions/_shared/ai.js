@@ -138,7 +138,20 @@ const traceScore = (points) => {
 
 const allSegmentsInside = (segments, region) => segments.every((segment) => segment.every((point) => pointInBox(point, region, 2)));
 
-const validPalmLine = (featureId, segments) => {
+const palmCoreBox = (subjectBox) => ({
+  x: subjectBox.x + subjectBox.width * 0.04,
+  y: subjectBox.y + subjectBox.height * 0.24,
+  width: subjectBox.width * 0.92,
+  height: subjectBox.height * 0.72,
+});
+
+const segmentDirection = (points) => {
+  const first = points[0] || { x: 0, y: 0 };
+  const last = points[points.length - 1] || first;
+  return { dx: last.x - first.x, dy: last.y - first.y };
+};
+
+const validPalmLine = (featureId, segments, subjectBox) => {
   const points = segments.flat();
   const bounds = pointsBounds(points);
   if (!bounds) return false;
@@ -160,12 +173,26 @@ const validPalmLine = (featureId, segments) => {
   const score = traceScore(points);
   if (points.length < requiredPoints || score.length < 4 || score.maxSegment > maxSegment) return false;
 
+  const core = palmCoreBox(subjectBox);
+  if (featureId !== "marriage_line" && !allSegmentsInside(segments, core)) return false;
+
   const center = boxCenter(bounds);
-  if (featureId === "life_line") return bounds.height >= 25 && bounds.width >= 5 && bounds.width <= 48 && center.y >= 50;
-  if (featureId === "head_line") return bounds.width >= 20 && bounds.height <= 36 && center.y >= 36 && center.y <= 72;
-  if (featureId === "heart_line") return bounds.width >= 20 && bounds.height <= 32 && center.y >= 18 && center.y <= 55;
-  if (featureId === "fate_line") return bounds.height >= 16 && bounds.width <= 36 && center.x >= 28 && center.x <= 72;
-  if (featureId === "marriage_line") return bounds.width >= 4 && bounds.width <= 24 && bounds.height <= 10 && center.y >= 15 && center.y <= 55 && (center.x <= 42 || center.x >= 58);
+  const direction = segmentDirection(points);
+  if (featureId === "life_line") {
+    return bounds.height >= 26 && bounds.width >= 6 && bounds.width <= 42 && bounds.height / bounds.width >= 1.15 && center.y >= core.y + core.height * 0.38;
+  }
+  if (featureId === "head_line") {
+    return bounds.width >= 24 && bounds.width <= 66 && bounds.height <= 34 && Math.abs(direction.dx) >= 16 && center.y >= core.y + core.height * 0.08 && center.y <= core.y + core.height * 0.68;
+  }
+  if (featureId === "heart_line") {
+    return bounds.width >= 22 && bounds.width <= 68 && bounds.height <= 24 && Math.abs(direction.dx) >= 16 && center.y >= core.y && center.y <= core.y + core.height * 0.34;
+  }
+  if (featureId === "fate_line") {
+    return bounds.height >= 20 && bounds.width <= 18 && Math.abs(direction.dy) >= 16 && center.x >= core.x + core.width * 0.34 && center.x <= core.x + core.width * 0.66;
+  }
+  if (featureId === "marriage_line") {
+    return bounds.width >= 4 && bounds.width <= 18 && bounds.height <= 7 && center.y >= subjectBox.y + subjectBox.height * 0.18 && center.y <= subjectBox.y + subjectBox.height * 0.48 && (center.x <= subjectBox.x + subjectBox.width * 0.36 || center.x >= subjectBox.x + subjectBox.width * 0.64);
+  }
   return true;
 };
 
@@ -190,7 +217,7 @@ const validFeatureGeometry = ({ kind, featureId, box, segments, subjectBox }) =>
   if (kind === "palm") {
     if (segments.length && !allSegmentsInside(segments, subjectBox)) return false;
     if (box && !boxInsideRegion(box, subjectBox)) return false;
-    if (palmMainLineIds.has(featureId)) return validPalmLine(featureId, segments);
+    if (palmMainLineIds.has(featureId)) return validPalmLine(featureId, segments, subjectBox);
     if (!box) return false;
     return box.width <= subjectBox.width * 0.72 && box.height <= subjectBox.height * 0.72;
   }
@@ -217,7 +244,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, userCorrecti
     ? `用户反馈说：${userCorrection}。请优先根据这句反馈重新检查，不是让用户标注，而是你自己修正识别。`
     : "";
   const palmGuide =
-    "这是手掌识别。第一步必须先框出整只手掌和手指的 subjectBox，后面所有掌纹点和候选框都必须在 subjectBox 里面；键盘、桌面、背景、手掌外面的东西一律不要标。第二步才看掌纹。生命线、智慧线、感情线大多是弧线，不是两点直线；清楚可画时每条主线必须给 6-10 个沿真实纹路走向的点，让曲线贴着掌纹转弯。生命线：从拇指和食指之间附近起，沿拇指根部大鱼际外缘向手腕方向弧形下行，绝不能画成穿过掌心的直线。智慧线：从虎口附近或生命线起点附近出发，横穿掌心中部，常向小指侧或月丘方向略下斜，也要沿纹路弯折。感情线：在手指根部下方，从小指侧横向走向食指/中指方向，位置在掌心上部，通常略弯，不要压到掌心中部。事业线：从掌底或掌心下方往中指方向上行，通常偏竖，常淡或断续，不清楚就只给候选框。婚姻线：在小指下方掌边，是短横线，可以 2-4 个点，不应画成横穿掌心的长线。断续线请用 segments 多段返回，不要把断开的地方硬连起来；每段点必须贴着能看到的纹路。若生命线、智慧线、感情线只能给 2-4 个点，说明不够确定，请返回 box 候选区并 needsReview=true，不要硬画。可选特征按优先级：生命线、智慧线、感情线、事业线、婚姻线，然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫。name 必须用普通名称。";
+    "这是手掌识别。第一步必须先框出整只手掌和手指的 subjectBox，后面所有掌纹点和候选框都必须在 subjectBox 里面；键盘、桌面、背景、手掌外面的东西一律不要标。第二步要先区分掌心和手指：生命线、智慧线、感情线、事业线必须画在掌心肉垫区域，不能画到手指、指节或指根上。生命线、智慧线、感情线大多是弧线，不是两点直线；清楚可画时每条主线必须给 6-10 个沿真实纹路走向的点，让曲线贴着掌纹转弯。生命线：从拇指和食指之间附近起，沿拇指根部大鱼际外缘向手腕方向弧形下行，绝不能画成穿过掌心的直线。智慧线：从虎口附近或生命线起点附近出发，横穿掌心中部，常向小指侧或月丘方向略下斜，也要沿纹路弯折。感情线：在手指根部下方、但仍在掌心上部，从小指侧横向走向食指/中指方向，通常略弯，不能画在手指上。事业线：从掌底或掌心下方往中指方向上行，通常偏竖，常淡或断续，不清楚就不要返回。婚姻线：在小指下方掌边，是短横线，可以 2-4 个点，不应画成横穿掌心的长线。断续线请用 segments 多段返回，不要把断开的地方硬连起来；每段点必须贴着能看到的纹路。若生命线、智慧线、感情线只能给 2-4 个点，说明不够确定，请不要返回这条线。可选特征按优先级：生命线、智慧线、感情线、事业线、婚姻线，然后才是成功线、财运纹、断掌、痣、岛纹、掌色、八宫。name 必须用普通名称。";
   const faceGuide =
     "这是面部识别。第一步必须先框出脸部主体 subjectBox，范围以额头到下巴、左右脸颊为主，不要把大面积头发、背景、衣服算进去。第二步才标五官。优先标注普通人能看懂的位置：印堂、额头、眉眼、山根、鼻头鼻翼、人中、嘴唇、法令纹、耳朵、下巴、痣疤和明显气色。面部只返回 box，不要返回 points，不要画横跨脸部的线。box 要贴近真实部位，例如印堂只框两眉之间，山根只框鼻梁上方，耳朵只框耳朵，不要大范围乱框；不确定就 needsReview=true 或不要返回。name 必须用普通名称。";
   const prompt =

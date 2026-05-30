@@ -243,6 +243,9 @@ const drawMarks = (kind, result) => {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const drawableSegments = normalizeSegments(feature).filter((segment) => canDrawTrace(kind, feature, segment));
     const firstPoint = drawableSegments[0]?.[0];
+    if (kind === "palm" && palmMainLineIds.has(feature.featureId) && !drawableSegments.length) {
+      continue;
+    }
 
     if (drawableSegments.length) {
       for (const segment of drawableSegments) {
