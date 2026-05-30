@@ -20,7 +20,7 @@ const parseJson = (text) => {
     return JSON.parse(cleaned);
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("AI 返回不是 JSON。");
+    if (!match) throw new Error("测算结果格式异常，请重试。");
     return JSON.parse(match[0]);
   }
 };
@@ -41,18 +41,18 @@ const parseAnalysis = (content) => {
 const explainAiError = (status, text, model) => {
   const raw = String(text || "");
   if ([408, 504, 524].includes(status)) {
-    return `AI 看图超时：${model} 这次没有及时返回。请换一张更近、更亮、背景更少的照片后重试；如果连续出现，说明百炼接口当前较慢。`;
+    return "看图超时了。请换一张更近、更亮、背景更少的照片后重试。";
   }
   if (status === 400 && /InvalidParameter|messages|image|video|vision/i.test(raw)) {
-    return `AI 看图失败：当前看图模型 ${model} 不接受这张图片。请确认 Cloudflare 里的 AI_VISION_MODEL 填的是支持图片/视频理解的模型，例如 qwen3.6-plus。`;
+    return "这张照片暂时看不了。请重新上传一张更清楚、背景更少的照片。";
   }
   if (status === 401 || status === 403) {
-    return "AI 看图失败：API Key 不对、没权限，或者百炼账号没有开通这个模型。";
+    return "测算服务暂时不可用，请联系管理员检查配置。";
   }
   if (status === 429) {
-    return "AI 看图失败：调用太频繁或额度用完了，稍后再试，或者检查百炼额度。";
+    return "今天请求太频繁了，请稍后再试。";
   }
-  return `AI 看图失败：接口返回 ${status}。请检查百炼 API Key、额度和模型名称。`;
+  return `看图失败，服务返回 ${status}。请稍后重试。`;
 };
 
 const fetchWithTimeout = async (url, options, timeoutMs, timeoutMessage) => {
@@ -81,7 +81,7 @@ const aiJsonMode = (env) => env.AI_JSON_MODE === "on";
 
 const callAiChat = async ({ env, model, messages, maxTokens = 300, temperature = 0, timeout = 30000, responseFormat = true, timeoutMessage }) => {
   if (!env.AI_API_KEY) {
-    throw new Error("尚未配置通义千问 API Key。请在 Cloudflare 环境变量中设置 AI_API_KEY。");
+    throw new Error("测算服务还没配置好，请联系管理员。");
   }
 
   const requestBody = {
@@ -106,7 +106,7 @@ const callAiChat = async ({ env, model, messages, maxTokens = 300, temperature =
       body: JSON.stringify(requestBody),
     },
     timeout,
-    timeoutMessage || `AI 请求超时：${model} 没有及时返回。`
+    timeoutMessage || "测算请求超时，请稍后重试。"
   );
 
   if (!response.ok) {
@@ -382,7 +382,7 @@ export const normalizeVisionResult = ({ kind, imageMeta, parsed }) => {
       notes: [
         ...(Array.isArray(parsed.notes) ? parsed.notes.slice(0, 3) : []),
       ],
-      reason: kind === "palm" ? "AI 没有先锁定手掌区域，已停止标注，避免乱画到背景上。" : "AI 没有先锁定脸部区域，已停止标注，避免乱框到背景上。",
+      reason: kind === "palm" ? "这张照片没有看清手掌主体，请重新拍一张掌心更完整的照片。" : "这张照片没有看清正脸主体，请重新拍一张五官更完整的照片。",
     });
   }
 
@@ -596,7 +596,7 @@ export const analyzeImage = async ({ kind, imageDataUrl, imageMeta, birth = {}, 
       },
     ],
     timeout: visionTimeout,
-    timeoutMessage: `AI 看图超时：${model} 这次没有在 ${Math.round(visionTimeout / 1000)} 秒内返回。请换一张更近、更亮、背景更少的照片后重试。`,
+    timeoutMessage: `看图超时了。这次没有在 ${Math.round(visionTimeout / 1000)} 秒内返回，请换一张更近、更亮、背景更少的照片后重试。`,
   });
   const parsed = parseAnalysis(content);
   return normalizeTextAnalysisResult({ kind, imageMeta, parsed });
@@ -656,7 +656,7 @@ export const generatePlainReading = async ({ bazi, palm, face, env }) => {
       maxTokens: 1200,
       messages: [{ role: "user", content: prompt }],
       timeout: timeoutMs(env.AI_REPORT_TIMEOUT_MS, 45000),
-      timeoutMessage: `AI 报告生成超时：${model} 这次没有及时返回。`,
+      timeoutMessage: "报告生成超时了，请稍后重试。",
     });
     const parsed = parseJson(content);
     return {

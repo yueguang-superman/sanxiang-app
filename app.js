@@ -15,15 +15,15 @@ localStorage.setItem("anonymousId", state.anonymousId);
 
 const apiErrorMessage = (path, error) => {
   if (isLocalFile) {
-    return `你现在打开的是本地文件，本地不能连接 AI 后端。请打开公网地址：${publicUrl}`;
+    return `你现在打开的是本地文件，本地不能测算。请打开公网地址：${publicUrl}`;
   }
   if (navigator.onLine === false) {
     return "当前设备好像断网了，请先检查网络。";
   }
   if (error?.name === "AbortError") {
-    return "后端响应超时了，请稍后重试。";
+    return "测算响应超时了，请稍后重试。";
   }
-  return `页面连不上后端接口 ${path}。请等 Cloudflare 部署完成后刷新；如果还不行，检查 Pages Functions 和环境变量。`;
+  return "页面暂时连不上测算服务。请等部署完成后刷新；如果还不行，把页面截图发给我。";
 };
 
 const api = async (path, body) => {
@@ -44,9 +44,9 @@ const api = async (path, body) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error(`后端接口 ${path} 没部署出来。请检查 Cloudflare Pages 是否已经完成部署。`);
+      throw new Error("测算服务还没准备好。请稍等一会儿再刷新。");
     }
-    throw new Error(data.error || `请求失败：${response.status}`);
+    throw new Error(data.error || "测算失败，请稍后重试。");
   }
   return data;
 };
@@ -281,7 +281,7 @@ const renderPhotoAnalysis = (kind, result) => {
   const featureHtml = features.length
     ? `<ul>${features.map((feature) => `<li><b>${escapeHtml(feature.name || "观察点")}：</b>${escapeHtml(feature.plainSummary || feature.evidence || "已完成分析。")}</li>`).join("")}</ul>`
     : "";
-  panel.innerHTML = sectionHtml || `<h4>${title}</h4>${featureHtml || "<p>AI 已完成照片分析，详细内容会进入综合报告。</p>"}`;
+  panel.innerHTML = sectionHtml || `<h4>${title}</h4>${featureHtml || "<p>照片已经看完，详细内容会进入综合报告。</p>"}`;
   if (sectionHtml && featureHtml) panel.insertAdjacentHTML("beforeend", featureHtml);
   panel.hidden = false;
 };
@@ -294,7 +294,7 @@ const analyze = async (kind, userCorrection = "") => {
   }
 
   const label = kind === "palm" ? "手掌照片" : "面部照片";
-  setMessage(`${kind}Status`, userCorrection ? `AI 正在按你的反馈重新分析${label}...` : `AI 正在分析${label}...`);
+  setMessage(`${kind}Status`, userCorrection ? `正在按你的反馈重新看${label}...` : `正在看${label}...`);
   try {
     const result = await api(`/api/analyze/${kind}`, {
       imageDataUrl: image.dataUrl,
@@ -507,7 +507,7 @@ const guideForFeature = (feature) => {
   const guide = featureGuides[key] || {};
   return {
     label: guide.label || feature.name || "识别位置",
-    plain: feature.plainSummary || guide.plain || "简单说：AI 看到了这个位置，但需要结合其他信息一起判断。",
+    plain: feature.plainSummary || guide.plain || "简单说：系统看到了这个位置，但需要结合其他信息一起判断。",
     advice: feature.advice || guide.advice || "建议：把它当作提醒，不要只凭一个点下结论。",
   };
 };
@@ -605,7 +605,7 @@ const renderReport = (report) => {
 
     <section class="report-section">
       <h3>参考来源</h3>
-      <p class="source">参考《周易》的取象方法，也借用了《麻衣神相》《神相全编》里的手相、面相部位说法，以及《三命通会》《滴天髓》《渊海子平》里的四柱五行思路。AI 只做照片清晰度判断和文字分析，不再在图上画线框。</p>
+      <p class="source">参考《周易》的取象方法，也借用了《麻衣神相》《神相全编》里的手相、面相部位说法，以及《三命通会》《滴天髓》《渊海子平》里的四柱五行思路。系统只判断照片是否清楚并生成文字，不再在图上画线框。</p>
     </section>
   `;
 };
@@ -685,7 +685,7 @@ $("clearAll").addEventListener("click", clearAll);
 
 if (isLocalFile) {
   $("workspace").classList.add("locked");
-  $("quotaStatus").textContent = "本地预览不能调用 AI";
+  $("quotaStatus").textContent = "本地预览不能测算";
   setMessage("accessMessage", `当前是本地预览，只能看界面，不能测算。请打开：${publicUrl}`, true);
 } else if (state.accessCode) {
   $("accessCode").value = state.accessCode;

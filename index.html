@@ -42,7 +42,7 @@
 
         <section class="access-panel" id="accessPanel">
           <h2>访问码</h2>
-          <p>输入共享访问码后开始测算。图片只用于本次云端识别，后端不保存原图。</p>
+          <p>输入共享访问码后开始测算。图片只用于本次看图测算，不会保存原图。</p>
           <div class="access-form">
             <input id="accessCode" type="password" autocomplete="off" placeholder="输入共享访问码" />
             <button id="unlockButton" type="button">进入</button>
@@ -124,7 +124,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>手掌图</h3>
-                    <p>掌心拍完整、光线亮一点。AI 会直接看生命线、智慧线、感情线、事业线、婚姻线，再用普通话解释。</p>
+                    <p>掌心拍完整、光线亮一点。系统会直接看生命线、智慧线、感情线、事业线、婚姻线，再用普通话解释。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -144,7 +144,7 @@
                 <div class="correction-panel" id="palmCorrectionPanel" hidden>
                   <div class="correction-head">
                     <strong>觉得分析不准？</strong>
-                    <span>简单说哪里不对，AI 会自己重看</span>
+                    <span>简单说哪里不对，系统会重新看</span>
                   </div>
                   <textarea id="palmCorrection" placeholder="例如：生命线其实不清楚；事业线不要强断；掌心状态说得不对"></textarea>
                   <button id="reanalyzePalm" type="button">按我的反馈重新分析</button>
@@ -155,7 +155,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>面部图</h3>
-                    <p>上传清楚正脸，额头到下巴尽量完整。AI 会直接看额头、眉眼、鼻子、人中、嘴唇、下巴和气色。</p>
+                    <p>上传清楚正脸，额头到下巴尽量完整。系统会直接看额头、眉眼、鼻子、人中、嘴唇、下巴和气色。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -175,7 +175,7 @@
                 <div class="correction-panel" id="faceCorrectionPanel" hidden>
                   <div class="correction-head">
                     <strong>觉得分析不准？</strong>
-                    <span>简单说哪里不对，AI 会自己重看</span>
+                    <span>简单说哪里不对，系统会重新看</span>
                   </div>
                   <textarea id="faceCorrection" placeholder="例如：额头没有那么饱满；眼神状态说得不对；鼻子部分重新看"></textarea>
                   <button id="reanalyzeFace" type="button">按我的反馈重新分析</button>
