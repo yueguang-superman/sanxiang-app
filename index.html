@@ -18,6 +18,7 @@
         </div>
 
         <section class="mystic-plate" aria-label="太极八卦盘">
+          <div class="plate-title">后天八卦 · 离南坎北</div>
           <div class="bagua-ring">
             <span class="tri kan"><b>☵</b><small>坎</small></span>
             <span class="tri gen"><b>☶</b><small>艮</small></span>
@@ -29,14 +30,14 @@
             <span class="tri qian"><b>☰</b><small>乾</small></span>
             <div class="taiji" aria-hidden="true">
               <svg class="taiji-svg" viewBox="0 0 100 100" role="img">
-                <circle cx="50" cy="50" r="48" class="yin" />
-                <path class="yang" d="M50 2a48 48 0 0 1 0 96a24 24 0 0 1 0-48a24 24 0 0 0 0-48" />
-                <circle cx="50" cy="26" r="7.5" class="yin-dot" />
-                <circle cx="50" cy="74" r="7.5" class="yang-dot" />
+                <circle cx="50" cy="50" r="48" class="taiji-dark" />
+                <path class="taiji-light" d="M50 2a48 48 0 0 1 0 96a24 24 0 0 1 0-48a24 24 0 0 0 0-48z" />
+                <circle cx="50" cy="26" r="9.5" class="taiji-dark-eye" />
+                <circle cx="50" cy="74" r="9.5" class="taiji-light-eye" />
               </svg>
             </div>
           </div>
-          <p>上传手掌和正脸照片，再填出生时间。系统先判断照片是否清楚，再直接生成通俗分析。</p>
+          <p>上传手掌和正脸照片，再填出生时间。系统不再乱画线，只判断照片能不能看清，然后直接给出大白话分析。</p>
         </section>
 
         <section class="access-panel" id="accessPanel">
@@ -57,7 +58,7 @@
 
         <section class="note">
           <h2>怎么理解</h2>
-          <p>这是传统文化娱乐工具。AI 不再画线框，只先判断照片是否完整清楚；能看清就按手相、面相、生辰八字写成大白话报告。</p>
+          <p>这是传统文化娱乐工具。照片不清楚就让用户重拍；照片清楚就直接看手相、面相和八字，写成人能听懂的话。</p>
         </section>
       </aside>
 
@@ -112,10 +113,10 @@
           <section class="band" id="images">
             <div class="section-head">
               <div>
-                <p class="eyebrow">AI Vision</p>
-                <h2>AI 直接看图分析</h2>
+                <p class="eyebrow">Photo Reading</p>
+                <h2>照片直接分析</h2>
               </div>
-              <span class="status-pill">图片不会长期保存</span>
+              <span class="status-pill">不画线，只出分析</span>
             </div>
 
             <div class="image-grid">
@@ -123,7 +124,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>手掌图</h3>
-                    <p>请拍清楚掌心，手掌尽量占满画面。系统会先看照片是否能用，再分析生命线、智慧线、感情线、事业线、婚姻线。</p>
+                    <p>掌心拍完整、光线亮一点。AI 会直接看生命线、智慧线、感情线、事业线、婚姻线，再用普通话解释。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
@@ -154,7 +155,7 @@
                 <div class="image-card-head">
                   <div>
                     <h3>面部图</h3>
-                    <p>请上传清楚正脸。系统会先看额头到下巴、五官是否完整，再分析印堂、眉眼、鼻子、人中、嘴唇、下巴等。</p>
+                    <p>上传清楚正脸，额头到下巴尽量完整。AI 会直接看额头、眉眼、鼻子、人中、嘴唇、下巴和气色。</p>
                   </div>
                   <label class="upload-button">
                     选择图片
