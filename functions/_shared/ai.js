@@ -624,6 +624,26 @@ const compactAnalysis = (result) =>
     .join("\n\n")
     .slice(0, 5000);
 
+const cleanReportText = (text) =>
+  String(text || "")
+    .replace(/Qwen3\.?6\s*Plus|Qwen3\.?7\s*Max|Qwen|AI|模型/g, "")
+    .replace(/(手部|手掌|面部|面相)?\s*(报告|分析)\s*(已准备|准备好了|已生成|已经生成|完成了)[，。；;]*/g, "")
+    .replace(/(根据|结合)?\s*(输入|原文|原始分析|以上材料|上述材料|两份报告)[，。；;]*/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+const cleanReportSections = (sections) =>
+  (Array.isArray(sections) ? sections : [])
+    .map((section) => ({
+      title: cleanReportText(section?.title || "综合解读").slice(0, 24) || "综合解读",
+      paragraphs: (Array.isArray(section?.paragraphs) ? section.paragraphs : [])
+        .map(cleanReportText)
+        .filter((text) => text && !/已准备|准备好了|已生成|原始分析|以上材料|上述材料|两份报告/.test(text))
+        .slice(0, 5),
+    }))
+    .filter((section) => section.paragraphs.length)
+    .slice(0, 8);
+
 export const generatePlainReading = async ({ bazi, palm, face, env }) => {
   if (!env.AI_API_KEY) return null;
 
@@ -641,11 +661,13 @@ export const generatePlainReading = async ({ bazi, palm, face, env }) => {
     faceFeatures: summarizeFeatures(face),
   };
   const prompt =
-    "你是传统文化测算报告助手。输入里已经有 Qwen3.6 Plus 对手掌照片和面部照片的原始分析，请以这些原文为主，再结合八字信息做精炼总结，不要重新编照片里看不到的东西。请按真人看图聊天的口吻写报告，格式参考：先给【核心画像】，再分【性格与思维】【事业与财富】【感情与家庭】【现实建议】【一句话总结】。" +
-    "要求：普通人能听懂；像认真给朋友分析；不要吓人，不要绝对化，不要编医学/投资结论；可以说“传统里一般会理解为”。" +
-    "如果输入没有某条线，就写“这张图里这条线不够清楚，先不强断”。现实建议要温和实用。" +
-    "输出必须是 JSON：{\"sections\":[{\"title\":\"整体特点\",\"paragraphs\":[\"...\"]}],\"reading\":[\"一句结论或建议\",...]}。" +
-    "sections 输出 7-8 段，每段 title 清楚，paragraphs 每段 2-5 句短句；reading 输出 4 条摘要。输入：" +
+    "你是传统文化测算师。现在已经看完手掌、面相和生辰资料，请直接给求测者结论和建议，不要解释流程。" +
+    "写法要像真人当面说话：先给一句核心画像，再讲性格做事、事业财运、感情家庭、状态提醒、现实建议，最后一句话收束。" +
+    "必须大白话、短平快、有判断，但不要吓人，不要绝对化，不要医学/投资/法律结论。可以说“传统里一般会理解为”。" +
+    "如果某条线或某个部位看不清，只说“这张图里不够清楚，先不强断”，不要补编。" +
+    "禁止出现这些流程词：手部报告已准备、面部报告已准备、报告已生成、原始分析、以上材料、上述材料、输入、模型、Qwen、AI。" +
+    "输出必须是 JSON：{\"sections\":[{\"title\":\"核心画像\",\"paragraphs\":[\"...\"]}],\"reading\":[\"一句直接建议\",...]}。" +
+    "sections 固定输出 6 段，标题依次为：核心画像、性格做事、事业财运、感情家庭、状态提醒、现实建议。每段 2-4 句短句。reading 输出 4 条直接结论或建议。资料：" +
     JSON.stringify(input);
 
   try {
@@ -659,9 +681,11 @@ export const generatePlainReading = async ({ bazi, palm, face, env }) => {
       timeoutMessage: "报告生成超时了，请稍后重试。",
     });
     const parsed = parseJson(content);
+    const sections = cleanReportSections(parsed.sections);
+    const reading = (Array.isArray(parsed.reading) ? parsed.reading : []).map(cleanReportText).filter(Boolean).slice(0, 6);
     return {
-      sections: Array.isArray(parsed.sections) ? parsed.sections.slice(0, 9) : [],
-      reading: Array.isArray(parsed.reading) ? parsed.reading.slice(0, 6).map(String) : [],
+      sections,
+      reading,
     };
   } catch {
     return null;
